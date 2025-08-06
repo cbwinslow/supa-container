@@ -1,8 +1,10 @@
-# Environments
+# Environments & Secrets
+# Ignore all .env files...
 .env
-.env*
-*.env
-*.env.local
+.env.*
+# ...except for the example file.
+!.env.example
+
 
 # Docker
 acme.json
@@ -33,3 +35,4 @@ bun.lockb
 .idea/
 *.swp
 *.swo
+.env
