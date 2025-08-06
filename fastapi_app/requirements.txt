@@ -18,3 +18,4 @@ opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-httpx
 opentelemetry-instrumentation-asyncpg
 opentelemetry-exporter-otlp
+langfuse

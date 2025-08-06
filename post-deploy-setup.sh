@@ -18,7 +18,8 @@ set -e
 # The script assumes it is being run from the APP_ROOT directory.
 APP_ROOT=$(pwd)
 ENV_FILE="$APP_ROOT/.env"
-SQL_SCHEMA_FILE="$APP_ROOT/../sql/schema.sql" # Assumes sql dir is one level up from APP_ROOT in the repo
+SQL_SCHEMA_FILE="$APP_ROOT/../sql/schema.sql"
+AUDIT_SCHEMA_FILE="$APP_ROOT/../sql/audit.sql"
 
 echo "==================================================================="
 echo " Supabase Super Stack: Post-Deployment Setup"
@@ -34,7 +35,7 @@ if ! docker-compose ps | grep -q "Up"; then
 fi
 
 # --- Step 1: Apply SQL Schema ---
-echo "--> [1/2] Applying database schema..."
+echo "--> [1/3] Applying main database schema..."
 if [ ! -f "$SQL_SCHEMA_FILE" ]; then
     echo "❌ ERROR: SQL schema file not found at $SQL_SCHEMA_FILE"
     exit 1
@@ -48,11 +49,21 @@ DB_NAME=$(grep "POSTGRES_DB" "$ENV_FILE" | cut -d '=' -f2)
 # Execute the schema file inside the Supabase container
 docker-compose exec -T supabase psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}" < "$SQL_SCHEMA_FILE"
 
-echo "✅ Database schema applied successfully."
+echo "✅ Main database schema applied successfully."
 echo ""
 
-# --- Step 2: Retrieve and Display Supabase API Keys ---
-echo "--> [2/2] Retrieving Supabase API Keys..."
+# --- Step 2: Apply Audit Log Schema ---
+echo "--> [2/3] Applying audit log schema..."
+if [ ! -f "$AUDIT_SCHEMA_FILE" ]; then
+    echo "❌ ERROR: Audit schema file not found at $AUDIT_SCHEMA_FILE"
+    exit 1
+fi
+docker-compose exec -T supabase psql "postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}" < "$AUDIT_SCHEMA_FILE"
+echo "✅ Audit log schema and triggers applied successfully."
+echo ""
+
+# --- Step 3: Retrieve and Display Supabase API Keys ---
+echo "--> [3/3] Retrieving Supabase API Keys..."
 echo "The following keys are required by your application. Please add them to your"
 echo ".env file located at: $ENV_FILE"
 echo ""

@@ -73,6 +73,14 @@ trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(otlp_exporter)
 # Instrument libraries
 AsyncPGInstrumentor().instrument()
 HTTPXClientInstrumentor().instrument()
+
+# --- Langfuse Instrumentation ---
+from langfuse import Langfuse
+from langfuse.fastapi import LangfuseMiddleware
+
+langfuse = Langfuse()
+# --- End Langfuse ---
+
 # --- End OpenTelemetry ---
 
 # Load environment variables
@@ -151,6 +159,7 @@ app = FastAPI(
 
 # Instrument FastAPI app after creation
 FastAPIInstrumentor.instrument_app(app)
+app.add_middleware(LangfuseMiddleware)
 
 # Add middleware with flexible CORS
 app.add_middleware(
@@ -311,6 +320,7 @@ async def save_conversation_turn(
     )
 
 
+@langfuse.trace()
 async def execute_agent(
     message: str,
     session_id: str,
