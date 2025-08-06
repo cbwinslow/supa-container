@@ -283,7 +283,7 @@ services:
 
   # --- 2. Frontend UI ---
   nextjs_app:
-    build: { context: /var/www/html/super-stack, dockerfile: Dockerfile }
+    build: { context: ./nextjs_app, dockerfile: Dockerfile }
     container_name: nextjs_app
     networks: [devops-net]
     env_file: .env
@@ -454,7 +454,7 @@ services:
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:latest
     container_name: loki
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
@@ -498,12 +498,23 @@ EOF
 echo "docker-compose.yml created."
 
 # --- Section 6: Copy Application Code ---
-echo "--> [6/7] Copying application code to production directories..."
-# Use rsync for a more reliable copy. This ensures all files, including hidden ones and Dockerfiles, are copied correctly.
+echo "--> [6/7] Copying all application code to $APP_ROOT..."
+# Use rsync for a more reliable copy.
 rsync -a --delete "$(pwd)/fastapi_app/" "$APP_ROOT/fastapi_app/"
-rsync -a --delete "$(pwd)/nextjs_app/" "$WEB_ROOT/"
-chown -R www-data:www-data "$WEB_ROOT"
-echo "Application code copied."
+rsync -a --delete "$(pwd)/nextjs_app/" "$APP_ROOT/nextjs_app/"
+
+# --- Verification Step ---
+echo "Verifying file copy..."
+if [ ! -f "$APP_ROOT/nextjs_app/Dockerfile" ]; then
+    echo "❌ CRITICAL ERROR: Frontend Dockerfile failed to copy."
+    exit 1
+fi
+if [ ! -f "$APP_ROOT/fastapi_app/Dockerfile" ]; then
+    echo "❌ CRITICAL ERROR: Backend Dockerfile failed to copy."
+    exit 1
+fi
+echo "✅ File copy verified."
+
 
 # --- Section 7: Create Helper Scripts ---
 echo "--> [7/7] Creating helper scripts..."
