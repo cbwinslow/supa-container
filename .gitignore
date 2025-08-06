@@ -36,3 +36,4 @@ bun.lockb
 *.swp
 *.swo
 .env
+Flowise/

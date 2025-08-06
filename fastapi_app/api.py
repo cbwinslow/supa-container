@@ -50,10 +50,36 @@ from .tools import (
     DocumentListInput
 )
 
+# --- OpenTelemetry Instrumentation ---
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
+
+# Setup OpenTelemetry
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+
+# Configure the OTLP exporter to send traces to the collector
+otlp_exporter = OTLPSpanExporter(
+    endpoint="otel-collector:4317",
+    insecure=True
+)
+trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(otlp_exporter))
+
+# Instrument libraries
+AsyncPGInstrumentor().instrument()
+HTTPXClientInstrumentor().instrument()
+# --- End OpenTelemetry ---
+
 # Load environment variables
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
 
 # Application configuration
 APP_ENV = os.getenv("APP_ENV", "development")
@@ -122,6 +148,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan
 )
+
+# Instrument FastAPI app after creation
+FastAPIInstrumentor.instrument_app(app)
 
 # Add middleware with flexible CORS
 app.add_middleware(

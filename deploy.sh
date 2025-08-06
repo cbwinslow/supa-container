@@ -101,6 +101,35 @@ APP_PORT=8058
 EOF
 echo ".env file created in $APP_ROOT/.env. Please review and save these passwords."
 
+# --- Section 3: Create OpenTelemetry Collector Config ---
+echo "--> [3/6] Creating OpenTelemetry Collector configuration..."
+cat <<'EOF' > "$APP_ROOT/otel-collector-config.yaml"
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+processors:
+  batch:
+
+exporters:
+  logging:
+    loglevel: debug
+  otlp/jaeger:
+    endpoint: "jaeger:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging, otlp/jaeger]
+EOF
+echo "OpenTelemetry Collector config created."
+
 # --- Section 3: Create Production Docker Compose with n8n ---
 echo "--> [3/5] Creating production docker-compose.yml with n8n..."
 cat <<'EOF' > "$APP_ROOT/docker-compose.yml"
@@ -117,6 +146,9 @@ volumes:
   localai_models:
   neo4j_data:
   flowise_data:
+
+  flowise_data:
+  jaeger_data:
 
 services:
   # --- 1. Edge Router & Load Balancer ---
@@ -247,6 +279,32 @@ services:
       - "traefik.http.routers.flowise.entrypoints=websecure"
       - "traefik.http.routers.flowise.tls.certresolver=myresolver"
       - "traefik.http.services.flowise.loadbalancer.server.port=3000"
+
+  # --- 10. Observability (Collector) ---
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    networks: [devops-net]
+    depends_on:
+      - jaeger
+
+  # --- 11. Observability (Tracing UI) ---
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    volumes: [jaeger_data:/badger]
+    networks: [devops-net]
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jaeger.rule=Host(`jaeger.${DOMAIN}`)"
+      - "traefik.http.routers.jaeger.entrypoints=websecure"
+      - "traefik.http.routers.jaeger.tls.certresolver=myresolver"
+      - "traefik.http.services.jaeger.loadbalancer.server.port=16686" # Jaeger UI Port
 EOF
 echo "docker-compose.yml created."
 
@@ -262,6 +320,23 @@ echo "Placeholder application files created."
 
 # --- Section 5: Create Helper Scripts ---
 echo "--> [5/5] Creating helper scripts..."
+cat <<EOF > "$APP_ROOT/grafana/provisioning/datasources/datasources.yml"
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    url: http://prometheus:9090
+    access: proxy
+    isDefault: true
+  - name: Loki
+    type: loki
+    url: http://loki:3100
+    access: proxy
+  - name: Jaeger
+    type: jaeger
+    url: http://jaeger:16686
+    access: proxy
+EOF
 cat <<EOF > "/usr/local/bin/setup_firewall.sh"
 #!/bin/bash
 echo "Configuring firewall (ufw)..."
