@@ -130,8 +130,8 @@ service:
 EOF
 echo "OpenTelemetry Collector config created."
 
-# --- Section 3: Create Production Docker Compose with n8n ---
-echo "--> [3/5] Creating production docker-compose.yml with n8n..."
+# --- Section 4: Create Production Docker Compose ---
+echo "--> [4/6] Creating production docker-compose.yml..."
 cat <<'EOF' > "$APP_ROOT/docker-compose.yml"
 version: '3.8'
 
@@ -189,6 +189,11 @@ services:
       - "traefik.http.routers.nextjs.entrypoints=websecure"
       - "traefik.http.routers.nextjs.tls.certresolver=myresolver"
       - "traefik.http.services.nextjs.loadbalancer.server.port=3000"
+      # Rule to proxy OpenTelemetry traces from the frontend to the collector
+      - "traefik.http.routers.otel.rule=Host(`${DOMAIN}`) && PathPrefix(`/otel`)"
+      - "traefik.http.routers.otel.entrypoints=websecure"
+      - "traefik.http.routers.otel.tls.certresolver=myresolver"
+      - "traefik.http.services.otel.loadbalancer.server.port=4318" # OTLP HTTP port on the collector
 
   # --- 3. Backend API (Agentic Logic) ---
   fastapi_app:

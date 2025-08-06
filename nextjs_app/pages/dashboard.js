@@ -1,150 +1,153 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import Sidebar from '../components/Sidebar';
+import Message from '../components/Message';
 
 export default function Dashboard() {
     const supabase = useSupabaseClient();
     const user = useUser();
-    const [file, setFile] = useState(null);
+    const [conversations, setConversations] = useState([]);
+    const [activeConversation, setActiveConversation] = useState(null);
+    const [messages, setMessages] = useState([]);
     const [query, setQuery] = useState('');
-    const [answer, setAnswer] = useState('');
-    const [toolsUsed, setToolsUsed] = useState([]);
+    const [models, setModels] = useState([]);
+    const [selectedModel, setSelectedModel] = useState('');
+    const [systemPrompt, setSystemPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [message, setMessage] = useState('');
+    const messagesEndRef = useRef(null);
 
-    const handleFileChange = (e) => setFile(e.target.files[0]);
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const res = await fetch('/api/models');
+                const data = await res.json();
+                setModels(data.data || []);
+                if (data.data?.length > 0) {
+                    setSelectedModel(data.data[0].id);
+                }
+            } catch (error) {
+                console.error("Failed to fetch models:", error);
+            }
+        };
+        fetchModels();
+    }, []);
 
-    const handleIngest = async () => {
-        if (!file) return setMessage('Please select a file.');
-        setIsLoading(true);
-        setMessage(`Ingesting ${file.name}...`);
-        const { data: { session } } = await supabase.auth.getSession();
-        const formData = new FormData();
-        formData.append('file', file);
+    useEffect(() => {
+        const fetchMessages = async () => {
+            if (activeConversation) {
+                const { data, error } = await supabase
+                    .from('messages')
+                    .select('role, content')
+                    .eq('session_id', activeConversation.id)
+                    .order('created_at');
+                if (error) console.error("Error fetching messages:", error);
+                else setMessages(data);
+            } else {
+                setMessages([]);
+            }
+        };
+        fetchMessages();
+    }, [activeConversation, supabase]);
 
-        try {
-            const res = await fetch('/api/ingest', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${session.access_token}` },
-                body: formData,
-            });
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.detail);
-            setMessage(result.message);
-        } catch (error) {
-            setMessage(`Ingestion failed: ${error.message}`);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
     const handleQuery = async () => {
-        if (!query) return setMessage('Please enter a query.');
+        if (!query || !activeConversation) return;
         setIsLoading(true);
-        setAnswer('');
-        setToolsUsed([]);
-        setMessage('');
+        const userMessage = { role: 'user', content: query };
+        setMessages(prev => [...prev, userMessage]);
+        setQuery('');
+
         const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+                message: query,
+                session_id: activeConversation.id,
+                metadata: { model: selectedModel, system_prompt: systemPrompt }
+            })
+        });
 
-        try {
-            const res = await fetch(`/api/chat/stream`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`
-                },
-                body: JSON.stringify({ message: query, session_id: user.id })
-            });
+        if (!response.body) {
+            setIsLoading(false);
+            return;
+        }
 
-            if (!res.body) throw new Error("No response body.");
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantResponse = { role: 'assistant', content: '' };
+        setMessages(prev => [...prev, assistantResponse]);
 
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-                
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const jsonStr = line.substring(6);
-                        if (jsonStr.trim()) {
-                            const data = JSON.parse(jsonStr);
-                            if (data.type === 'text') {
-                                setAnswer(prev => prev + data.content);
-                            } else if (data.type === 'tools') {
-                                setToolsUsed(data.tools);
-                            }
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const jsonStr = line.substring(6);
+                    if (jsonStr.trim()) {
+                        const data = JSON.parse(jsonStr);
+                        if (data.type === 'text') {
+                            assistantResponse.content += data.content;
+                            setMessages(prev => [...prev.slice(0, -1), { ...assistantResponse }]);
                         }
                     }
                 }
             }
-        } catch (error) {
-            setMessage(`Query failed: ${error.message}`);
-        } finally {
-            setIsLoading(false);
         }
+        setIsLoading(false);
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4">
-            <div className="w-full max-w-4xl">
-                <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl">Agentic RAG Dashboard</h1>
-                    <button onClick={() => supabase.auth.signOut()} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
-                        Sign Out
-                    </button>
+        <div className="flex h-screen bg-gray-900 text-white">
+            <Sidebar
+                conversations={conversations}
+                setConversations={setConversations}
+                activeConversation={activeConversation}
+                setActiveConversation={setActiveConversation}
+            />
+            <div className="flex-1 flex flex-col">
+                <div className="flex-1 overflow-y-auto">
+                    {messages.map((msg, index) => <Message key={index} message={msg} />)}
+                    <div ref={messagesEndRef} />
                 </div>
-
-                <div className="bg-gray-800 p-6 rounded-lg mb-8">
-                    <h2 className="text-2xl mb-4">1. Ingest PDF Document</h2>
-                    <div className="flex items-center space-x-4">
-                        <input type="file" onChange={handleFileChange} accept=".pdf" className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"/>
-                        <button onClick={handleIngest} disabled={isLoading || !file} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50">
-                            {isLoading ? 'Ingesting...' : 'Ingest Document'}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="bg-gray-800 p-6 rounded-lg">
-                    <h2 className="text-2xl mb-4">2. Query Your Documents</h2>
-                    <div className="flex items-center space-x-4 mb-4">
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="e.g., How is Microsoft connected to OpenAI?"
-                            className="w-full p-2 rounded bg-gray-700 text-white"
-                        />
-                        <button onClick={handleQuery} disabled={isLoading || !query} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50">
-                            {isLoading ? 'Querying...' : 'Ask Agent'}
-                        </button>
-                    </div>
-                    {message && <p className="text-sm text-gray-400 my-4">{message}</p>}
-                    
-                    {answer && (
-                        <div className="bg-gray-700 p-4 rounded mt-4">
-                            <h3 className="text-xl mb-2">Agent's Answer:</h3>
-                            <p className="whitespace-pre-wrap">{answer}</p>
+                <div className="p-4 bg-gray-800 border-t border-gray-700">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="flex items-center space-x-4">
+                            <textarea
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuery(); } }}
+                                placeholder="Ask the agent anything..."
+                                className="w-full p-2 rounded bg-gray-700 text-white resize-none"
+                                rows={1}
+                            />
+                            <button onClick={handleQuery} disabled={isLoading || !query} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50">
+                                Send
+                            </button>
                         </div>
-                    )}
-
-                    {toolsUsed.length > 0 && (
-                        <div className="bg-gray-700 p-4 rounded mt-4">
-                            <h3 className="text-xl mb-2">Tools Used:</h3>
-                            <ul className="list-disc list-inside">
-                                {toolsUsed.map((tool, index) => (
-                                    <li key={index} className="font-mono text-sm">
-                                        {tool.tool_name}({JSON.stringify(tool.args)})
-                                    </li>
-                                ))}
-                            </ul>
+                        <div className="flex items-center space-x-4 mt-2">
+                            <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className="bg-gray-700 text-white p-2 rounded">
+                                {models.map(model => <option key={model.id} value={model.id}>{model.id}</option>)}
+                            </select>
+                            <input
+                                type="text"
+                                value={systemPrompt}
+                                onChange={(e) => setSystemPrompt(e.target.value)}
+                                placeholder="Custom system prompt..."
+                                className="w-full p-2 rounded bg-gray-700 text-white"
+                            />
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
-
