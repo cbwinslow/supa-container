@@ -178,56 +178,8 @@ scrape_configs:
 EOF
 echo "Promtail config created."
 
-echo "Promtail config created."
-
 # --- Section 5: Create Monitoring Configs ---
 echo "--> [5/7] Creating monitoring configurations..."
-cat <<'EOF' > "$APP_ROOT/prometheus.yml"
-global:
-  scrape_interval: 15s
-scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
-  # Add exporters for services like postgres, neo4j etc. here
-EOF
-cat <<'EOF' > "$APP_ROOT/loki-config.yaml"
-auth_enabled: false
-server:
-  http_listen_port: 3100
-ingester:
-  lifecycler:
-    address: 127.0.0.1
-    ring:
-      kvstore:
-        store: inmemory
-      replication_factor: 1
-    final_sleep: 0s
-  chunk_idle_period: 5m
-  chunk_retain_period: 1m
-  max_transfer_retries: 0
-schema_config:
-  configs:
-    - from: 2020-10-24
-      store: boltdb-shipper
-      object_store: filesystem
-      schema: v11
-      index:
-        prefix: index_
-        period: 24h
-storage_config:
-  boltdb_shipper:
-    active_index_directory: /loki/boltdb-shipper-active
-    cache_location: /loki/boltdb-shipper-cache
-    cache_ttl: 24h
-    shared_store: filesystem
-  filesystem:
-    directory: /loki/chunks
-compactor:
-  working_directory: /loki/boltdb-shipper-compactor
-  shared_store: filesystem
-EOF
-echo "Monitoring configs created."
 
 # --- Section 6: Create Production Docker Compose ---
 echo "--> [6/7] Creating production docker-compose.yml..."
