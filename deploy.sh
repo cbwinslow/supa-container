@@ -11,7 +11,7 @@ else
 fi
 
 # --- Check for Root Privileges ---
-if [ "\$EUID" -ne 0 ]; then
+if [ "$EUID" -ne 0 ]; then
   echo "This script must be run as root or with sudo."
   exit 1
 fi
@@ -25,7 +25,7 @@ echo "Web Root: $WEB_ROOT"
 echo "==================================================================="
 
 # --- Section 1: Create Directories and Permissions ---
-echo "--> [1/5] Creating directories and setting permissions..."
+echo "--> [1/6] Creating directories and setting permissions..."
 mkdir -p "$WEB_ROOT"
 mkdir -p "$APP_ROOT"/{traefik,n8n_data,fastapi_app,nextjs_app,prometheus,grafana/provisioning/{datasources,dashboards},loki,promtail,opensearch/config,opensearch-dashboards/config,supabase}
 touch "$APP_ROOT/traefik/acme.json"
@@ -34,7 +34,7 @@ chown -R www-data:www-data "$WEB_ROOT"
 echo "Directories created."
 
 # --- Section 2: Create Secure .env File ---
-echo "--> [2/5] Creating secure .env file..."
+echo "--> [2/6] Creating secure .env file..."
 # Generate a hashed password for Traefik basic auth
 export TRAEFIK_ADMIN_PASSWORD_HASH=\$(htpasswd -nb admin "\$TRAEFIK_ADMIN_PASSWORD")
 
@@ -55,7 +55,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
 POSTGRES_DB=postgres
 # Full URL for services that need it (like Graphiti)
-DATABASE_URL=postgresql://\${POSTGRES_USER}:\${POSTGRES_PASSWORD}@supabase:5432/\${POSTGRES_DB}
+DATABASE_URL=postgresql://\\\$\\{POSTGRES_USER}:\\$\\{POSTGRES_PASSWORD}@supabase:5432/\\$\\{POSTGRES_DB}
 
 # --- Neo4j (Knowledge Graph) ---
 NEO4J_USER=neo4j
@@ -135,7 +135,6 @@ EOF
 echo "OpenTelemetry Collector config created."
 
 # --- Section 4: Create Promtail (Log Shipping) Config ---
-
 echo "--> [4/6] Creating Promtail configuration..."
 cat <<'EOF' > "$APP_ROOT/promtail-config.yaml"
 server:
@@ -168,7 +167,7 @@ scrape_configs:
           __path__: /var/log/traefik/access.log
     pipeline_stages:
       - regex:
-          expression: '^(?P<ip>\\S+) - (?P<user>\\S+) \[(?P<time>[\w:/]+\s[+\\-]\\d{4})\] "(?P<method>\\S+) (?P<path>\\S+) (?P<protocol>\\S+)" (?P<status>\\d{3}) (?P<bytes>\\d+) "(?P<referer>[^\"]*)" "(?P<user_agent>[^\"]*)"'
+          expression: '^(?P<ip>\\S+) - (?P<user>\\S+) \[(?P<time>[\w:/]+\s[+\\-]\\d{4})\ \"(?P<method>\\S+)\ (?P<path>\\S+)\ (?P<protocol>\\S+)\"\ (?P<status>\\d{3})\ (?P<bytes>\\d+)\"?(?P<referer>[^\"]*)\"\ \"(?P<user_agent>[^\"]*)\"' 
       - labels:
           ip:
           user:
@@ -181,7 +180,6 @@ echo "Promtail config created."
 
 # --- Section 5: Create Production Docker Compose ---
 echo "--> [5/6] Creating production docker-compose.yml..."
-
 cat <<'EOF' > "$APP_ROOT/docker-compose.yml"
 version: '3.8'
 
@@ -398,8 +396,8 @@ services:
 EOF
 echo "docker-compose.yml created."
 
-# --- Section 4: Copy Application Code ---
-echo "--> [4/6] Copying application code to production directories..."
+# --- Section 6: Create Helper Scripts ---
+echo "--> [6/6] Creating helper scripts..."
 # Copy the entire backend application
 cp -r "$(pwd)/fastapi_app/." "$APP_ROOT/fastapi_app/"
 # Copy the entire frontend application
@@ -407,8 +405,6 @@ cp -r "$(pwd)/nextjs_app/." "$WEB_ROOT/"
 chown -R www-data:www-data "$WEB_ROOT"
 echo "Application code copied."
 
-# --- Section 5: Create Helper Scripts ---
-echo "--> [5/5] Creating helper scripts..."
 cat <<EOF > "$APP_ROOT/grafana/provisioning/datasources/datasources.yml"
 apiVersion: 1
 datasources:

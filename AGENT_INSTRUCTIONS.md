@@ -6,64 +6,70 @@ This document provides the necessary context, architectural overview, and operat
 
 ## 1. Project Overview & Goal
 
-The primary goal of this project is to provide a **production-grade, deployable platform for an advanced agentic RAG system**. The system combines traditional vector search with a knowledge graph to provide deep, contextual analysis of ingested documents.
-
-The project is architected as a multi-service, containerized application managed by Docker Compose and is designed to be deployed on a dedicated server.
+The primary goal of this project is to provide a **production-grade, deployable platform for an advanced AIOps and Agentic RAG system**. The system combines a sophisticated agentic backend (RAG + Knowledge Graph) with a full suite of production services, including a polished UI, workflow automation, and a comprehensive observability stack designed for intelligent, self-aware operation.
 
 ## 2. Core Architecture
 
-The application is composed of several key services that work together. Understanding this architecture is critical.
+The application is a complex, multi-service, containerized system. Understanding this architecture is critical.
 
 ```
 [ User Browser ]
        |
        v (HTTPS on your-domain.com)
-[ Traefik Reverse Proxy ]
+[ Traefik Reverse Proxy ] (Captures Access Logs -> Promtail)
        |
-       +--> [ Next.js Frontend ] <--> [ Supabase (Auth) ]
-       |      (UI)
+       +--> [ Next.js Frontend ] ---------> [ Supabase (Auth) ]
+       |      (UI, OpenTelemetry Traces)
        |
-       +--> [ FastAPI Backend ] <--> [ Supabase (Postgres/pgvector) ]
-       |      (Agentic API) |      (Vector Store & App Data)
-       |                    |
-       |                    +------> [ Neo4j ]
-       |                    |        (Knowledge Graph)
-       |                    |
-       |                    +------> [ LocalAI ]
-       |                             (LLM & Embedding Models)
+       +--> [ FastAPI Backend ] ---------> [ Supabase (Postgres/pgvector) ]
+       |      (Agentic API, OpenTelemetry & Langfuse Traces) | (Vector Store, App Data, Audit Log)
+       |                                                    |
+       |                                                    +--> [ Neo4j ]
+       |                                                    |    (Knowledge Graph)
+       |                                                    |
+       |                                                    +--> [ LocalAI ]
+       |                                                         (LLM & Embedding Models)
        |
        +--> [ Flowise ] (AI Lab)
        |
        +--> [ n8n ] (Workflow Automation)
        |
-       +--> [ Jaeger ] (Observability UI)
+       +--> [ Jaeger ] (Trace Visualization)
        |
-       +--> [ OpenTelemetry Collector ] <-- (Traces from Frontend/Backend)
+       +--> [ Langfuse ] (LLM Trace Visualization)
+       |
+       +--> [ OpenTelemetry Collector ] <--+ (Traces from Frontend/Backend)
+       |                                    |
+       +------------------------------------+
+       |
+[ Promtail ] (Collects all container & Traefik logs) -> [ Loki ] (Log Aggregation)
+       |
+[ Grafana ] (Unified Dashboards for Metrics, Logs, Traces)
 ```
 
--   **Traefik:** The single entry point for all web traffic. It handles HTTPS, routing to services, and security.
--   **Next.js Frontend:** The user-facing application, built in React. It handles user authentication via Supabase and communicates with the FastAPI backend.
--   **FastAPI Backend:** The "brains" of the application. It's a Python service that contains the AI agent, all the RAG and knowledge graph logic, and the API endpoints.
--   **Supabase:** A containerized Supabase instance that provides PostgreSQL for data storage (including vector embeddings) and handles all user authentication.
--   **Neo4j:** The database for the knowledge graph.
--   **LocalAI:** The service for running local LLMs and embedding models.
+-   **Traefik:** The single entry point. Handles HTTPS, routing, and generates access logs for traffic monitoring.
+-   **Next.js Frontend:** The user-facing application. Instrumented with OpenTelemetry.
+-   **FastAPI Backend:** The "brains" of the application. Instrumented with both OpenTelemetry and Langfuse.
+-   **Supabase:** Provides PostgreSQL, vector storage, user authentication, and a database-level **audit log**.
+-   **Neo4j & LocalAI:** Core components for the agent's knowledge graph and AI model serving.
 -   **Flowise & n8n:** Integrated tools for prototyping and automation.
--   **Observability Stack:** OpenTelemetry and Jaeger provide full-stack distributed tracing.
+-   **AIOps & Observability Stack:**
+    -   **OpenTelemetry & Jaeger:** Provide full-stack distributed tracing.
+    -   **Langfuse:** Provides deep observability into the performance and quality of the LLM agent.
+    -   **Promtail & Loki:** Aggregate logs from all services, including Traefik's traffic logs.
+    -   **Grafana:** The central dashboard for visualizing all monitoring data.
 
 ## 3. Key Files & Conventions
 
--   **`deploy.sh`:** The **single source of truth** for the production environment's structure. It generates the `docker-compose.yml` and other necessary configuration files. **When adding a new service or changing a configuration, this is the primary file to modify.**
--   **`config.sh`:** The user-facing configuration file. All high-level settings (domain, passwords, etc.) are managed here.
--   **`post-deploy-setup.sh`:** The script for finalizing the setup *after* the containers are running. It handles database schema migration and API key retrieval.
--   **`fastapi_app/`:** The directory for the Python backend. Follow existing conventions for structure (e.g., `api.py` for endpoints, `tools.py` for agent tools).
--   **`nextjs_app/`:** The directory for the React frontend.
--   **`sql/schema.sql`:** The definitive schema for the PostgreSQL database. Any database changes **must** be reflected here.
+-   **`deploy.sh`:** The **single source of truth** for the production environment's structure. **When adding a new service or changing a configuration, this is the primary file to modify.**
+-   **`config.sh`:** The user-facing configuration file.
+-   **`post-deploy-setup.sh`:** The script for finalizing the setup *after* the containers are running. It handles database schema migrations (including the audit log) and API key retrieval.
+-   **`sql/`:** Contains the definitive schemas for the database (`schema.sql`) and the audit log (`audit.sql`).
+-   **Always work on a feature branch.** Never commit directly to `master`.
 
 ## 4. Operational Guidelines
 
--   **Always work on a feature branch.** Never commit directly to `master`.
--   **The deployment target is a server.** All scripts and configurations are designed with this in mind (e.g., file paths in `/opt` and `/var/www/html`).
--   **Test thoroughly.** The project has a `tests/` directory with a Pytest suite. Any changes to the backend **must** be accompanied by corresponding tests.
--   **Follow existing style.** Mimic the code style, naming conventions, and architectural patterns already present in the codebase.
--   **Update documentation.** Any significant changes must be reflected in the `README.md`.
--   **Secrets are managed by the user.** Never hardcode secrets. The `deploy.sh` script generates a `.env` file, which the user populates. Do not attempt to access or manage secrets directly.
+-   **The system is designed for production.** Assume all changes must be robust, secure, and well-documented.
+-   **Test thoroughly.** Any changes to the backend **must** be accompanied by corresponding tests in the `tests/` directory.
+-   **Update documentation.** Any significant changes must be reflected in the `README.md` and this file.
+-   **Secrets are managed by the user.** Never hardcode secrets. The `deploy.sh` script generates a `.env` file, which the user populates.
