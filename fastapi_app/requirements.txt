@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-dotenv
+httpx
+qdrant-client
+pypdf
+langchain
+supabase
+jose
+passlib[bcrypt]
+python-multipart
+cryptography
