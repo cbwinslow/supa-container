@@ -36,7 +36,7 @@ echo "Directories created."
 # --- Section 2: Create Secure .env File ---
 echo "--> [2/6] Creating secure .env file..."
 # Generate a hashed password for Traefik basic auth
-export TRAEFIK_ADMIN_PASSWORD_HASH=\$(htpasswd -nb admin "\$TRAEFIK_ADMIN_PASSWORD")
+export TRAEFIK_ADMIN_PASSWORD_HASH=$(htpasswd -nb admin "$TRAEFIK_ADMIN_PASSWORD")
 
 cat <<EOF > "$APP_ROOT/.env"
 # --- Production Environment Variables ---
@@ -178,8 +178,59 @@ scrape_configs:
 EOF
 echo "Promtail config created."
 
-# --- Section 5: Create Production Docker Compose ---
-echo "--> [5/6] Creating production docker-compose.yml..."
+echo "Promtail config created."
+
+# --- Section 5: Create Monitoring Configs ---
+echo "--> [5/7] Creating monitoring configurations..."
+cat <<'EOF' > "$APP_ROOT/prometheus.yml"
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+  # Add exporters for services like postgres, neo4j etc. here
+EOF
+cat <<'EOF' > "$APP_ROOT/loki-config.yaml"
+auth_enabled: false
+server:
+  http_listen_port: 3100
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 5m
+  chunk_retain_period: 1m
+  max_transfer_retries: 0
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/boltdb-shipper-active
+    cache_location: /loki/boltdb-shipper-cache
+    cache_ttl: 24h
+    shared_store: filesystem
+  filesystem:
+    directory: /loki/chunks
+compactor:
+  working_directory: /loki/boltdb-shipper-compactor
+  shared_store: filesystem
+EOF
+echo "Monitoring configs created."
+
+# --- Section 6: Create Production Docker Compose ---
+echo "--> [6/7] Creating production docker-compose.yml..."
 cat <<'EOF' > "$APP_ROOT/docker-compose.yml"
 version: '3.8'
 
@@ -196,6 +247,9 @@ volumes:
   flowise_data:
   jaeger_data:
   langfuse_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
 
 services:
   # --- 1. Edge Router & Load Balancer ---
@@ -381,7 +435,54 @@ services:
       - "traefik.http.routers.langfuse.tls.certresolver=myresolver"
       - "traefik.http.services.langfuse.loadbalancer.server.port=3000"
 
-  # --- 13. Log Shipping (Promtail) ---
+  # --- 13. Monitoring Services ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks: [devops-net]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=myresolver"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks: [devops-net]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.loki.rule=Host(`loki.${DOMAIN}`)"
+      - "traefik.http.routers.loki.entrypoints=websecure"
+      - "traefik.http.routers.loki.tls.certresolver=myresolver"
+      - "traefik.http.services.loki.loadbalancer.server.port=3100"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks: [devops-net]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=myresolver"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  # --- 14. Log Shipping (Promtail) ---
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
@@ -396,14 +497,16 @@ services:
 EOF
 echo "docker-compose.yml created."
 
-# --- Section 6: Create Helper Scripts ---
-echo "--> [6/6] Creating helper scripts..."
-# Copy the entire backend application
-cp -r "$(pwd)/fastapi_app/." "$APP_ROOT/fastapi_app/"
-# Copy the entire frontend application
-cp -r "$(pwd)/nextjs_app/." "$WEB_ROOT/"
+# --- Section 6: Copy Application Code ---
+echo "--> [6/7] Copying application code to production directories..."
+# Use rsync for a more reliable copy. This ensures all files, including hidden ones and Dockerfiles, are copied correctly.
+rsync -a --delete "$(pwd)/fastapi_app/" "$APP_ROOT/fastapi_app/"
+rsync -a --delete "$(pwd)/nextjs_app/" "$WEB_ROOT/"
 chown -R www-data:www-data "$WEB_ROOT"
 echo "Application code copied."
+
+# --- Section 7: Create Helper Scripts ---
+echo "--> [7/7] Creating helper scripts..."
 
 cat <<EOF > "$APP_ROOT/grafana/provisioning/datasources/datasources.yml"
 apiVersion: 1
