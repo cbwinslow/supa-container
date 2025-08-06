@@ -1,27 +1,128 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
+import json
 from agent.api import app
+
+# Use pytest-asyncio for async tests
+pytestmark = pytest.mark.asyncio
 
 client = TestClient(app)
 
+# --- Mocks and Fixtures ---
+
+@pytest.fixture
+def mock_db_utils():
+    """Mocks all functions in the db_utils module."""
+    with patch('agent.api.initialize_database', new_callable=AsyncMock) as mock_init_db, \
+         patch('agent.api.close_database', new_callable=AsyncMock) as mock_close_db, \
+         patch('agent.api.create_session', new_callable=AsyncMock, return_value="new-session-123") as mock_create, \
+         patch('agent.api.get_session', new_callable=AsyncMock, return_value={"id": "existing-session-456"}) as mock_get, \
+         patch('agent.api.add_message', new_callable=AsyncMock) as mock_add, \
+         patch('agent.api.get_session_messages', new_callable=AsyncMock, return_value=[]) as mock_get_messages, \
+         patch('agent.api.test_connection', new_callable=AsyncMock, return_value=True) as mock_test_conn:
+        yield {
+            "create_session": mock_create,
+            "get_session": mock_get,
+            "add_message": mock_add,
+            "get_session_messages": mock_get_messages
+        }
+
+@pytest.fixture
+def mock_graph_utils():
+    """Mocks all functions in the graph_utils module."""
+    with patch('agent.api.initialize_graph', new_callable=AsyncMock) as mock_init_graph, \
+         patch('agent.api.close_graph', new_callable=AsyncMock) as mock_close_graph, \
+         patch('agent.api.test_graph_connection', new_callable=AsyncMock, return_value=True) as mock_test_graph:
+        yield
+
 @pytest.fixture
 def mock_agent_execution():
+    """Mocks the core agent execution logic."""
     with patch('agent.api.execute_agent', new_callable=AsyncMock) as mock_execute:
-        mock_execute.return_value = ("Mocked AI response", [])
+        mock_execute.return_value = ("Mocked AI response", [{"tool_name": "vector_search", "args": {"query": "Hello"}}])
         yield mock_execute
 
-def test_health_check():
+@pytest.fixture
+def mock_tools():
+    """Mocks the individual search tools."""
+    with patch('agent.api.vector_search_tool', new_callable=AsyncMock, return_value=[{"content": "vector search result"}]) as mock_vector, \
+         patch('agent.api.graph_search_tool', new_callable=AsyncMock, return_value=[{"fact": "graph search result"}]) as mock_graph, \
+         patch('agent.api.hybrid_search_tool', new_callable=AsyncMock, return_value=[{"content": "hybrid search result"}]) as mock_hybrid:
+        yield {
+            "vector": mock_vector,
+            "graph": mock_graph,
+            "hybrid": mock_hybrid
+        }
+
+# --- API Tests ---
+
+async def test_health_check(mock_db_utils, mock_graph_utils):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "healthy"
+    json_data = response.json()
+    assert json_data["status"] == "healthy"
+    assert json_data["database"] is True
+    assert json_data["graph_database"] is True
 
-def test_chat_endpoint(mock_agent_execution):
+async def test_chat_endpoint_creates_session(mock_db_utils, mock_agent_execution):
+    mock_db_utils["get_session"].return_value = None # Simulate no existing session
     response = client.post("/chat", json={"message": "Hello"})
     assert response.status_code == 200
-    json_response = response.json()
-    assert json_response["message"] == "Mocked AI response"
-    assert "session_id" in json_response
+    mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
+    assert response.json()["session_id"] == "new-session-123"
 
-# Add more tests for streaming, search endpoints, etc.
+async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_execution):
+    response = client.post("/chat", json={"message": "Hello again", "session_id": "existing-session-456"})
+    assert response.status_code == 200
+    mock_db_utils["get_session"].assert_called_with("existing-session-456")
+    mock_db_utils["create_session"].assert_not_called()
+    mock_agent_execution.assert_called_once()
+    assert response.json()["session_id"] == "existing-session-456"
+    assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
+
+async def test_chat_stream_endpoint(mock_db_utils):
+    # Mock the agent's streaming logic
+    async def mock_streamer(*args, **kwargs):
+        yield f"data: {json.dumps({'type': 'session', 'session_id': 'stream-session-789'})}\n\n"
+        yield f"data: {json.dumps({'type': 'text', 'content': 'Hello '})}\\n\n"
+        yield f"data: {json.dumps({'type': 'text', 'content': 'World!'})}\\n\n"
+        yield f"data: {json.dumps({'type': 'tools', 'tools': [{'tool_name': 'test_tool'}]})}\\n\n"
+        yield f"data: {json.dumps({'type': 'end'})}\\n\n"
+
+    with patch('agent.api.generate_stream', new_callable=AsyncMock, return_value=mock_streamer()):
+        response = client.post("/chat/stream", json={"message": "stream test"})
+        assert response.status_code == 200
+        # In a real test client, you would iterate over the streaming response
+        # Here we just confirm the endpoint is reachable and returns a streaming content type
+        assert "text/event-stream" in response.headers["content-type"]
+
+async def test_vector_search_endpoint(mock_tools):
+    with patch('agent.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
+        response = client.post("/search/vector", json={"query": "test"})
+        assert response.status_code == 200
+        json_data = response.json()
+        assert json_data["search_type"] == "vector"
+        assert len(json_data["results"]) == 1
+        assert json_data["results"][0]["content"] == "vector search result"
+        mock_tools["vector"].assert_called_once()
+
+async def test_graph_search_endpoint(mock_tools):
+    response = client.post("/search/graph", json={"query": "test"})
+    assert response.status_code == 200
+    json_data = response.json()
+    assert json_data["search_type"] == "graph"
+    assert len(json_data["graph_results"]) == 1
+    assert json_data["graph_results"][0]["fact"] == "graph search result"
+    mock_tools["graph"].assert_called_once()
+
+async def test_hybrid_search_endpoint(mock_tools):
+    with patch('agent.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
+        response = client.post("/search/hybrid", json={"query": "test"})
+        assert response.status_code == 200
+        json_data = response.json()
+        assert json_data["search_type"] == "hybrid"
+        assert len(json_data["results"]) == 1
+        assert json_data["results"][0]["content"] == "hybrid search result"
+        mock_tools["hybrid"].assert_called_once()
