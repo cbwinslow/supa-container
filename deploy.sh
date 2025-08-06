@@ -132,6 +132,7 @@ echo "OpenTelemetry Collector config created."
 
 # --- Section 4: Create Production Docker Compose ---
 echo "--> [4/6] Creating production docker-compose.yml..."
+echo "--> [4/6] Creating production docker-compose.yml..."
 cat <<'EOF' > "$APP_ROOT/docker-compose.yml"
 version: '3.8'
 
@@ -145,8 +146,6 @@ volumes:
   qdrant_data:
   localai_models:
   neo4j_data:
-  flowise_data:
-
   flowise_data:
   jaeger_data:
 
@@ -313,15 +312,14 @@ services:
 EOF
 echo "docker-compose.yml created."
 
-# --- Section 4: Create Application Code ---
-echo "--> [4/5] Creating application code..."
-# This will be handled in subsequent steps to build out the full RAG UI and API.
-# For now, create placeholders.
-mkdir -p "$APP_ROOT/fastapi_app"
-touch "$APP_ROOT/fastapi_app/main.py"
-mkdir -p "$WEB_ROOT/pages"
-touch "$WEB_ROOT/pages/index.js"
-echo "Placeholder application files created."
+# --- Section 4: Copy Application Code ---
+echo "--> [4/6] Copying application code to production directories..."
+# Copy the entire backend application
+cp -r "$(pwd)/fastapi_app/." "$APP_ROOT/fastapi_app/"
+# Copy the entire frontend application
+cp -r "$(pwd)/nextjs_app/." "$WEB_ROOT/"
+chown -R www-data:www-data "$WEB_ROOT"
+echo "Application code copied."
 
 # --- Section 5: Create Helper Scripts ---
 echo "--> [5/5] Creating helper scripts..."
@@ -363,5 +361,7 @@ echo "NEXT STEPS:"
 echo "1. Edit 'config.sh' with your domain, email, and passwords."
 echo "2. Run this script again: sudo ./deploy.sh"
 echo "3. Run the firewall script ONCE: sudo /usr/local/bin/setup_firewall.sh"
-echo "4. cd $APP_ROOT && sudo docker-compose up -d"
+echo "4. Start the services: cd $APP_ROOT && sudo docker-compose up -d"
+echo "5. Run the post-deployment setup script to initialize the database and get API keys:"
+echo "   cd $APP_ROOT && sudo ../post-deploy-setup.sh"
 echo "==================================================================="
