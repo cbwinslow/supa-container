@@ -32,9 +32,9 @@ This repository provides a one-click deployment script to set up the entire cont
 
 ## Deployment Walkthrough
 
-Deploying this platform involves three main steps: configuration, deployment, and post-deployment setup.
+Deploying this platform is now a simple, four-step process.
 
-### Step 1: Configuration
+### Step 1: Configure Your Deployment
 
 1.  **Clone the Repository:**
     ```bash
@@ -42,54 +42,52 @@ Deploying this platform involves three main steps: configuration, deployment, an
     cd supa-container
     ```
 
-2.  **Edit the Configuration File:**
-    Open the `config.sh` file. This is the central place to manage your deployment settings.
-    ```bash
-    # The primary domain you will use for all services.
-    export DOMAIN="your-domain.com"
+2.  **Edit the Main Configuration File:**
+    Open `config.sh` and set your domain, email, and a secure password for the Traefik dashboard.
 
-    # The email address for Let's Encrypt SSL registration.
-    export LETSENCRYPT_EMAIL="your-email@your-domain.com"
+### Step 2: Generate Secrets
 
-    # A secure password for the Traefik dashboard.
-    export TRAEFIK_ADMIN_PASSWORD="your-secure-traefik-password"
-    ```
-    **Fill in these three variables with your actual domain, email, and a secure password.**
+Run the new `populate_secrets.sh` script. This will read your config and create a `.env` file with all the necessary secure, random passwords for your services.
 
-### Step 2: Deployment
+```bash
+bash populate_secrets.sh
+```
+*(This step does not require `sudo`)*
 
-Run the main deployment script with `sudo`. This script creates the necessary directories, generates all configuration files, and copies the application code to the correct locations.
+### Step 3: Deploy the Application
+
+Run the main deployment script with `sudo`. This will create the server directories, copy the application code, and generate the final `docker-compose.yml`.
+
 ```bash
 sudo bash deploy.sh
 ```
 
-### Step 3: Post-Deployment Setup
+### Step 4: Final Setup & Key Retrieval
 
-After the deployment script finishes, run a one-time setup script to initialize the database and retrieve your Supabase API keys.
+This is a one-time setup to initialize the database and get your unique Supabase API keys.
 
 1.  **Start the Services:**
     ```bash
     cd /opt/supabase-super-stack
     sudo docker-compose up -d
     ```
-    Wait a minute or two for all services to start up.
+    Wait a minute for all services to start.
 
 2.  **Run the Post-Deployment Script:**
-    This script connects to your running Supabase container, applies the database schemas (including the audit log), and fetches your unique API keys.
+    This script will apply the database schemas and fetch your API keys.
     ```bash
     # From the /opt/supabase-super-stack directory
     sudo ../post-deploy-setup.sh
     ```
 
 3.  **Update Your `.env` File:**
-    The script will print out two lines for `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. **You must manually copy these lines and paste them into your `.env` file:**
+    The script will print your unique `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. **Manually copy these lines and paste them into your `.env` file:**
     ```bash
     sudo nano /opt/supabase-super-stack/.env
     ```
-    Paste the keys at the bottom of the file.
 
 4.  **Restart the Application:**
-    For the new environment variables to take effect, restart the relevant services.
+    For the new keys to take effect, restart the relevant services.
     ```bash
     sudo docker-compose restart nextjs_app fastapi_app
     ```
