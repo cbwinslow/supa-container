@@ -37,3 +37,4 @@ bun.lockb
 *.swo
 .env
 Flowise/
+.env.test
