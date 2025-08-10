@@ -15,14 +15,7 @@ from dotenv import load_dotenv
 from .chunker import DocumentChunk
 
 # Import flexible providers
-try:
-    from ..agent.providers import get_embedding_client, get_embedding_model
-except ImportError:
-    # For direct execution or testing
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from agent.providers import get_embedding_client, get_embedding_model
+from fastapi_app.providers import get_embedding_client, get_embedding_model
 
 # Load environment variables
 load_dotenv()

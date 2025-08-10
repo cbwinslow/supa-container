@@ -20,18 +20,9 @@ from .embedder import create_embedder
 from .graph_builder import create_graph_builder
 
 # Import agent utilities
-try:
-    from ..agent.db_utils import initialize_database, close_database, db_pool
-    from ..agent.graph_utils import initialize_graph, close_graph
-    from ..agent.models import IngestionConfig, IngestionResult
-except ImportError:
-    # For direct execution or testing
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from agent.db_utils import initialize_database, close_database, db_pool
-    from agent.graph_utils import initialize_graph, close_graph
-    from agent.models import IngestionConfig, IngestionResult
+from fastapi_app.db_utils import initialize_database, close_database, db_pool
+from fastapi_app.graph_utils import initialize_graph, close_graph
+from fastapi_app.models import IngestionConfig, IngestionResult
 
 # Load environment variables
 load_dotenv()

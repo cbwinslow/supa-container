@@ -1,20 +1,20 @@
 import pytest
 import os
 from unittest.mock import patch
-from agent.providers import get_llm_model, get_embedding_client, get_embedding_model, validate_configuration
+from fastapi_app.providers import get_llm_model, get_embedding_client, get_embedding_model, validate_configuration
 
 def test_get_llm_model_default():
     """Tests that the default LLM model is configured correctly."""
     with patch.dict(os.environ, {"LLM_CHOICE": "gpt-test", "LLM_BASE_URL": "http://test.local", "LLM_API_KEY": "test-key"}):
         model = get_llm_model()
-        assert model.model_name == "gpt-test"
-        assert model.provider.client.base_url == "http://test.local"
+        assert model.model == "gpt-test"
+        assert model.client.base_url == "http://test.local"
 
 def test_get_llm_model_override():
     """Tests that the model choice can be overridden."""
     with patch.dict(os.environ, {"LLM_CHOICE": "gpt-default", "LLM_BASE_URL": "http://test.local", "LLM_API_KEY": "test-key"}):
         model = get_llm_model(model_choice="gpt-override")
-        assert model.model_name == "gpt-override"
+        assert model.model == "gpt-override"
 
 def test_get_embedding_client():
     """Tests that the embedding client is configured correctly from env vars."""

@@ -2,7 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock, MagicMock
 import json
-from agent.api import app
+from fastapi_app.api import app
+from fastapi_app.models import ChunkResult, GraphSearchResult
 
 # Use pytest-asyncio for async tests
 pytestmark = pytest.mark.asyncio
@@ -14,13 +15,13 @@ client = TestClient(app)
 @pytest.fixture
 def mock_db_utils():
     """Mocks all functions in the db_utils module."""
-    with patch('agent.api.initialize_database', new_callable=AsyncMock) as mock_init_db, \
-         patch('agent.api.close_database', new_callable=AsyncMock) as mock_close_db, \
-         patch('agent.api.create_session', new_callable=AsyncMock, return_value="new-session-123") as mock_create, \
-         patch('agent.api.get_session', new_callable=AsyncMock, return_value={"id": "existing-session-456"}) as mock_get, \
-         patch('agent.api.add_message', new_callable=AsyncMock) as mock_add, \
-         patch('agent.api.get_session_messages', new_callable=AsyncMock, return_value=[]) as mock_get_messages, \
-         patch('agent.api.test_connection', new_callable=AsyncMock, return_value=True) as mock_test_conn:
+    with patch('fastapi_app.api.initialize_database', new_callable=AsyncMock) as mock_init_db, \
+         patch('fastapi_app.api.close_database', new_callable=AsyncMock) as mock_close_db, \
+         patch('fastapi_app.api.create_session', new_callable=AsyncMock, return_value="new-session-123") as mock_create, \
+         patch('fastapi_app.api.get_session', new_callable=AsyncMock, return_value={"id": "existing-session-456"}) as mock_get, \
+         patch('fastapi_app.api.add_message', new_callable=AsyncMock) as mock_add, \
+         patch('fastapi_app.api.get_session_messages', new_callable=AsyncMock, return_value=[]) as mock_get_messages, \
+         patch('fastapi_app.api.test_connection', new_callable=AsyncMock, return_value=True) as mock_test_conn:
         yield {
             "create_session": mock_create,
             "get_session": mock_get,
@@ -31,24 +32,24 @@ def mock_db_utils():
 @pytest.fixture
 def mock_graph_utils():
     """Mocks all functions in the graph_utils module."""
-    with patch('agent.api.initialize_graph', new_callable=AsyncMock) as mock_init_graph, \
-         patch('agent.api.close_graph', new_callable=AsyncMock) as mock_close_graph, \
-         patch('agent.api.test_graph_connection', new_callable=AsyncMock, return_value=True) as mock_test_graph:
+    with patch('fastapi_app.api.initialize_graph', new_callable=AsyncMock) as mock_init_graph, \
+         patch('fastapi_app.api.close_graph', new_callable=AsyncMock) as mock_close_graph, \
+         patch('fastapi_app.api.test_graph_connection', new_callable=AsyncMock, return_value=True) as mock_test_graph:
         yield
 
 @pytest.fixture
 def mock_agent_execution():
     """Mocks the core agent execution logic."""
-    with patch('agent.api.execute_agent', new_callable=AsyncMock) as mock_execute:
+    with patch('fastapi_app.api.execute_agent', new_callable=AsyncMock) as mock_execute:
         mock_execute.return_value = ("Mocked AI response", [{"tool_name": "vector_search", "args": {"query": "Hello"}}])
         yield mock_execute
 
 @pytest.fixture
 def mock_tools():
     """Mocks the individual search tools."""
-    with patch('agent.api.vector_search_tool', new_callable=AsyncMock, return_value=[{"content": "vector search result"}]) as mock_vector, \
-         patch('agent.api.graph_search_tool', new_callable=AsyncMock, return_value=[{"fact": "graph search result"}]) as mock_graph, \
-         patch('agent.api.hybrid_search_tool', new_callable=AsyncMock, return_value=[{"content": "hybrid search result"}]) as mock_hybrid:
+    with patch('fastapi_app.api.vector_search_tool', new_callable=AsyncMock, return_value=[ChunkResult(chunk_id="1", document_id="doc1", content="vector search result", score=0.9, document_title="Doc 1", document_source="src1")]) as mock_vector, \
+         patch('fastapi_app.api.graph_search_tool', new_callable=AsyncMock, return_value=[GraphSearchResult(fact="graph search result", uuid="uuid1")]) as mock_graph, \
+         patch('fastapi_app.api.hybrid_search_tool', new_callable=AsyncMock, return_value=[ChunkResult(chunk_id="1", document_id="doc1", content="hybrid search result", score=0.9, document_title="Doc 1", document_source="src1")]) as mock_hybrid:
         yield {
             "vector": mock_vector,
             "graph": mock_graph,
@@ -84,14 +85,16 @@ async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_exe
 
 async def test_chat_stream_endpoint(mock_db_utils):
     # Mock the agent's streaming logic
-    async def mock_streamer(*args, **kwargs):
-        yield f"data: {json.dumps({'type': 'session', 'session_id': 'stream-session-789'})}\n\n"
-        yield f"data: {json.dumps({'type': 'text', 'content': 'Hello '})}\\n\n"
-        yield f"data: {json.dumps({'type': 'text', 'content': 'World!'})}\\n\n"
-        yield f"data: {json.dumps({'type': 'tools', 'tools': [{'tool_name': 'test_tool'}]})}\\n\n"
-        yield f"data: {json.dumps({'type': 'end'})}\\n\n"
-
-    with patch('agent.api.generate_stream', new_callable=AsyncMock, return_value=mock_streamer()):
+    with patch('fastapi_app.api.rag_agent.iter') as mock_iter:
+        async def mock_streamer(*args, **kwargs):
+            yield f"data: {json.dumps({'type': 'session', 'session_id': 'stream-session-789'})}\n\n"
+            yield f"data: {json.dumps({'type': 'text', 'content': 'Hello '})}\n\n"
+            yield f"data: {json.dumps({'type': 'text', 'content': 'World!'})}\n\n"
+            yield f"data: {json.dumps({'type': 'tools', 'tools': [{'tool_name': 'test_tool'}]})}\n\n"
+            yield f"data: {json.dumps({'type': 'end'})}\n\n"
+        
+        mock_iter.return_value.__aenter__.return_value = mock_streamer() # type: ignore
+        
         response = client.post("/chat/stream", json={"message": "stream test"})
         assert response.status_code == 200
         # In a real test client, you would iterate over the streaming response
@@ -99,7 +102,7 @@ async def test_chat_stream_endpoint(mock_db_utils):
         assert "text/event-stream" in response.headers["content-type"]
 
 async def test_vector_search_endpoint(mock_tools):
-    with patch('agent.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
+    with patch('fastapi_app.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
         response = client.post("/search/vector", json={"query": "test"})
         assert response.status_code == 200
         json_data = response.json()
@@ -118,7 +121,7 @@ async def test_graph_search_endpoint(mock_tools):
     mock_tools["graph"].assert_called_once()
 
 async def test_hybrid_search_endpoint(mock_tools):
-    with patch('agent.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
+    with patch('fastapi_app.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
         response = client.post("/search/hybrid", json={"query": "test"})
         assert response.status_code == 200
         json_data = response.json()

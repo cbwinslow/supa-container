@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, AsyncMock
-from agent.agent import rag_agent, AgentDependencies
-from agent.providers import get_llm_model
+from fastapi_app.agent import rag_agent, AgentDependencies
+from fastapi_app.providers import get_llm_model
 
 pytestmark = pytest.mark.asyncio
 
@@ -9,7 +9,7 @@ def test_agent_initialization():
     """Tests that the agent and its dependencies initialize correctly."""
     assert rag_agent is not None
     # Pydantic AI v2 uses a different structure, we verify the llm model is set
-    assert rag_agent.llm.model_name is not None
+    assert rag_agent.llm.model is not None
 
     # Test AgentDependencies dataclass
     deps = AgentDependencies(session_id="test-session")
@@ -33,7 +33,7 @@ async def test_agent_run_flow():
 def test_agent_tools_are_registered():
     """Verifies that all expected tools are registered with the agent."""
     # In Pydantic AI v2, tools are methods on the agent class instance
-    registered_tool_names = [tool.__name__ for tool in rag_agent.tools]
+    registered_tool_names = [tool.__name__ for tool in rag_agent.tools()]
     
     expected_tools = [
         "vector_search",

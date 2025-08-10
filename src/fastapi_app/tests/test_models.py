@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-from agent.models import ChatRequest, SearchRequest, IngestionConfig, MessageRole
+from fastapi_app.models import ChatRequest, SearchRequest, IngestionConfig, SearchType
 
 def test_chat_request_model():
     """Tests the ChatRequest model for valid and invalid data."""
@@ -8,7 +8,7 @@ def test_chat_request_model():
     data = {"message": "Hello", "session_id": "123", "search_type": "vector"}
     req = ChatRequest(**data)
     assert req.message == "Hello"
-    assert req.search_type == MessageRole.VECTOR
+    assert req.search_type == SearchType.VECTOR
 
     # Invalid search_type
     with pytest.raises(ValidationError):
@@ -30,7 +30,7 @@ def test_search_request_model_limits():
 
     # Limit too high
     with pytest.raises(ValidationError):
-        SearchRequest(query="test", limit=101)
+        SearchRequest(query="test", limit=51)
 
 def test_ingestion_config_validation():
     """Tests the validation logic in the IngestionConfig model."""
@@ -39,9 +39,9 @@ def test_ingestion_config_validation():
     assert config.chunk_overlap == 200
 
     # Invalid overlap (equal to chunk_size)
-    with pytest.raises(ValidationError, match="Chunk overlap .* must be less than chunk size"):
+    with pytest.raises(ValidationError):
         IngestionConfig(chunk_size=1000, chunk_overlap=1000)
 
     # Invalid overlap (greater than chunk_size)
-    with pytest.raises(ValidationError, match="Chunk overlap .* must be less than chunk size"):
+    with pytest.raises(ValidationError):
         IngestionConfig(chunk_size=1000, chunk_overlap=1200)

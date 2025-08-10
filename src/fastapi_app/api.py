@@ -18,8 +18,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
 from dotenv import load_dotenv
 
-from .agent import rag_agent, AgentDependencies
-from .db_utils import (
+from fastapi_app.agent import rag_agent, AgentDependencies
+from fastapi_app.db_utils import (
     initialize_database,
     close_database,
     create_session,
@@ -28,8 +28,8 @@ from .db_utils import (
     get_session_messages,
     test_connection
 )
-from .graph_utils import initialize_graph, close_graph, test_graph_connection
-from .models import (
+from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
+from fastapi_app.models import (
     ChatRequest,
     ChatResponse,
     SearchRequest,
@@ -39,7 +39,7 @@ from .models import (
     HealthStatus,
     ToolCall
 )
-from .tools import (
+from fastapi_app.tools import (
     vector_search_tool,
     graph_search_tool,
     hybrid_search_tool,
@@ -76,7 +76,7 @@ HTTPXClientInstrumentor().instrument()
 
 # --- Langfuse Instrumentation ---
 from langfuse import Langfuse
-from langfuse.fastapi import LangfuseMiddleware
+
 
 langfuse = Langfuse()
 # --- End Langfuse ---
@@ -159,7 +159,6 @@ app = FastAPI(
 
 # Instrument FastAPI app after creation
 FastAPIInstrumentor.instrument_app(app)
-app.add_middleware(LangfuseMiddleware)
 
 # Add middleware with flexible CORS
 app.add_middleware(
@@ -320,7 +319,6 @@ async def save_conversation_turn(
     )
 
 
-@langfuse.trace()
 async def execute_agent(
     message: str,
     session_id: str,

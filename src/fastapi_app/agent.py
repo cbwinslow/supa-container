@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext
 from dotenv import load_dotenv
 
-from .prompts import SYSTEM_PROMPT
-from .providers import get_llm_model
-from .tools import (
+from fastapi_app.prompts import SYSTEM_PROMPT
+from fastapi_app.providers import get_llm_model
+from fastapi_app.tools import (
     vector_search_tool,
     graph_search_tool,
     hybrid_search_tool,

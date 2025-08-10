@@ -17,14 +17,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Import flexible providers
-try:
-    from ..agent.providers import get_embedding_client, get_ingestion_model
-except ImportError:
-    # For direct execution or testing
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from agent.providers import get_embedding_client, get_ingestion_model
+from fastapi_app.providers import get_embedding_client, get_ingestion_model
 
 # Initialize clients with flexible providers
 embedding_client = get_embedding_client()

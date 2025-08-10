@@ -15,14 +15,7 @@ from dotenv import load_dotenv
 from .chunker import DocumentChunk
 
 # Import graph utilities
-try:
-    from ..agent.graph_utils import GraphitiClient
-except ImportError:
-    # For direct execution or testing
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from agent.graph_utils import GraphitiClient
+from fastapi_app.graph_utils import GraphitiClient
 
 # Load environment variables
 load_dotenv()

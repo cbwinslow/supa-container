@@ -1,13 +1,13 @@
 import pytest
-from unittest.mock import patch, AsyncMock
-from agent.graph_utils import GraphitiClient, search_knowledge_graph
+from unittest.mock import patch, AsyncMock, MagicMock
+from fastapi_app.graph_utils import GraphitiClient, search_knowledge_graph
 
 pytestmark = pytest.mark.asyncio
 
 @pytest.fixture
 def mock_graphiti_native():
     """Mocks the underlying Graphiti library."""
-    with patch('agent.graph_utils.Graphiti') as mock_graphiti:
+    with patch('fastapi_app.graph_utils.Graphiti') as mock_graphiti:
         instance = AsyncMock()
         instance.search.return_value = [
             MagicMock(fact="Test fact 1", uuid="uuid1"),
@@ -34,7 +34,7 @@ async def test_graphiti_client_search(mock_graphiti_native):
 
 async def test_search_knowledge_graph_wrapper(mock_graphiti_native):
     # This tests the convenience wrapper function
-    with patch('agent.graph_utils.graph_client', new_callable=AsyncMock) as mock_client_instance:
+    with patch('fastapi_app.graph_utils.graph_client', new_callable=AsyncMock) as mock_client_instance:
         mock_client_instance.search.return_value = [{"fact": "wrapper result"}]
         
         results = await search_knowledge_graph("wrapper query")

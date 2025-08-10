@@ -1,25 +1,24 @@
 import pytest
 from unittest.mock import patch, AsyncMock
-from agent.tools import vector_search_tool, graph_search_tool, VectorSearchInput, GraphSearchInput
+from fastapi_app.tools import vector_search_tool, graph_search_tool, VectorSearchInput, GraphSearchInput
 
 pytestmark = pytest.mark.asyncio
 
 @pytest.fixture
 def mock_db_calls():
-    with patch('agent.tools.vector_search', new_callable=AsyncMock) as mock_vector, \
-         patch('agent.tools.hybrid_search', new_callable=AsyncMock) as mock_hybrid:
+    with patch('fastapi_app.tools.vector_search', new_callable=AsyncMock) as mock_vector,         patch('fastapi_app.tools.hybrid_search', new_callable=AsyncMock) as mock_hybrid:
         mock_vector.return_value = [{"chunk_id": "1", "document_id": "doc1", "content": "vec result", "similarity": 0.9, "metadata": {}, "document_title": "Doc 1", "document_source": "src1"}]
         yield {"vector": mock_vector, "hybrid": mock_hybrid}
 
 @pytest.fixture
 def mock_graph_calls():
-    with patch('agent.tools.search_knowledge_graph', new_callable=AsyncMock) as mock_search:
+    with patch('fastapi_app.tools.search_knowledge_graph', new_callable=AsyncMock) as mock_search:
         mock_search.return_value = [{"fact": "graph result", "uuid": "uuid1"}]
         yield mock_search
 
 @pytest.fixture
 def mock_embedding():
-    with patch('agent.tools.generate_embedding', new_callable=AsyncMock) as mock_embed:
+    with patch('fastapi_app.tools.generate_embedding', new_callable=AsyncMock) as mock_embed:
         mock_embed.return_value = [0.1] * 1536
         yield mock_embed
 
