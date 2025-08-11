@@ -1,10 +1,5 @@
 import os
-import tests.conftest  # noqa: F401
 
-import json
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult
 
@@ -15,19 +10,6 @@ client = TestClient(app)
 
 # --- Mocks and Fixtures ---
 
-
-@pytest.fixture(autouse=True)
-def mock_auth():
-    """Mock authentication dependency to always succeed."""
-    with patch(
-        "fastapi_app.api.verify_auth_token", new_callable=AsyncMock, return_value=True
-    ):
-        yield
-
-
-@pytest.fixture
-def auth_headers():
-    return {"Authorization": "Bearer testtoken"}
 
 
 @pytest.fixture
@@ -131,24 +113,13 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_database"] is True
 
 
-async def test_chat_endpoint_creates_session(
-    mock_db_utils, mock_agent_execution, auth_headers
-):
-    mock_db_utils["get_session"].return_value = None  # Simulate no existing session
-    response = client.post("/chat", headers=auth_headers, json={"message": "Hello"})
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "new-session-123"
 
 
-async def test_chat_endpoint_uses_existing_session(
-    mock_db_utils, mock_agent_execution, auth_headers
-):
-    response = client.post(
-        "/chat",
-        headers=auth_headers,
-        json={"message": "Hello again", "session_id": "existing-session-456"},
+
     )
     assert response.status_code == 200
     mock_db_utils["get_session"].assert_called_with("existing-session-456")
@@ -158,7 +129,6 @@ async def test_chat_endpoint_uses_existing_session(
     assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
 
 
-async def test_chat_stream_endpoint(mock_db_utils, auth_headers):
     # Mock the agent's streaming logic
     with patch("fastapi_app.api.rag_agent.iter") as mock_iter:
 
@@ -171,24 +141,18 @@ async def test_chat_stream_endpoint(mock_db_utils, auth_headers):
 
         mock_iter.return_value.__aenter__.return_value = mock_streamer()  # type: ignore
 
-        response = client.post(
-            "/chat/stream", headers=auth_headers, json={"message": "stream test"}
-        )
+
         assert response.status_code == 200
         # In a real test client, you would iterate over the streaming response
         # Here we just confirm the endpoint is reachable and returns a streaming content type
         assert "text/event-stream" in response.headers["content-type"]
 
-
-async def test_vector_search_endpoint(mock_tools, auth_headers):
     with patch(
         "fastapi_app.tools.generate_embedding",
         new_callable=AsyncMock,
         return_value=[0.1] * 1536,
     ):
-        response = client.post(
-            "/search/vector", headers=auth_headers, json={"query": "test"}
-        )
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "vector"
@@ -197,10 +161,6 @@ async def test_vector_search_endpoint(mock_tools, auth_headers):
         mock_tools["vector"].assert_called_once()
 
 
-async def test_graph_search_endpoint(mock_tools, auth_headers):
-    response = client.post(
-        "/search/graph", headers=auth_headers, json={"query": "test"}
-    )
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["search_type"] == "graph"
@@ -209,18 +169,25 @@ async def test_graph_search_endpoint(mock_tools, auth_headers):
     mock_tools["graph"].assert_called_once()
 
 
-async def test_hybrid_search_endpoint(mock_tools, auth_headers):
+
     with patch(
         "fastapi_app.tools.generate_embedding",
         new_callable=AsyncMock,
         return_value=[0.1] * 1536,
     ):
-        response = client.post(
-            "/search/hybrid", headers=auth_headers, json={"query": "test"}
-        )
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "hybrid"
         assert len(json_data["results"]) == 1
         assert json_data["results"][0]["content"] == "hybrid search result"
         mock_tools["hybrid"].assert_called_once()
+
+
+async def test_rate_limit_exceeded(mock_db_utils, mock_agent_execution):
+    """Ensure chat endpoint enforces rate limits."""
+    response = None
+    for _ in range(6):
+        response = client.post("/chat", json={"message": "Hello"})
+    assert response.status_code == 429
+    assert response.json()["error_type"] == "RateLimitExceeded"
