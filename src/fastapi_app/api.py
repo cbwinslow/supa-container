@@ -532,7 +532,7 @@ async def health_check():
                     context_str = "\n".join(
                         [f"{msg['role']}: {msg['content']}" for msg in context[-6:]]
                     )
-                    full_prompt = f"Previous conversation:\n{context_str}\n\nCurrent question: {chat_request.message}"
+
 
                 # Save user message immediately
                 await add_message(
@@ -545,12 +545,7 @@ async def health_check():
                 full_response = ""
 
                 # Stream using agent.iter() pattern
-                async with rag_agent.iter(full_prompt, deps=deps) as r:
-                    run = r
-                    async for node in r:
-                        if rag_agent.is_model_request_node(node):
-                            # Stream tokens from the model
-                            async with node.stream(r.ctx) as request_stream:
+
                                 async for event in request_stream:
                                     from pydantic_ai.messages import (
                                         PartStartEvent,
@@ -574,9 +569,12 @@ async def health_check():
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                # Extract tools used from the final result
-                result = run.result
-                tools_used = extract_tool_calls(result)
+                if run is not None:
+                    # Extract tools used from the final result
+                    result = run.result
+                    tools_used = extract_tool_calls(result)
+                else:
+                    tools_used = []
 
                 # Send tools used information
                 if tools_used:
@@ -600,39 +598,7 @@ async def health_check():
 
             except Exception as e:
                 logger.error(f"Stream error: {e}")
-                error_chunk = {"type": "error", "content": str(e)}
-                yield f"data: {json.dumps(error_chunk)}\n\n"
-            finally:
-                if run is not None:
-                    close_func = getattr(run, "aclose", None) or getattr(run, "close", None)
-                    if close_func:
-                        try:
-                            if asyncio.iscoroutinefunction(close_func):
-                                await close_func()
-                            else:
-                                close_func()
-                        except Exception as close_err:
-                    try:
-                        # Prefer aclose only if run is an async generator or async context manager
-                        if inspect.isasyncgen(run):
-                            await run.aclose()
-                        elif hasattr(run, "__aexit__"):
-                            # If it's an async context manager, call aclose if present
-                            aclose_func = getattr(run, "aclose", None)
-                            if aclose_func and asyncio.iscoroutinefunction(aclose_func):
-                                await aclose_func()
-                            elif hasattr(run, "close"):
-                                close_func = getattr(run, "close")
-                                if asyncio.iscoroutinefunction(close_func):
-                                    await close_func()
-                                else:
-                                    close_func()
-                        elif hasattr(run, "close"):
-                            close_func = getattr(run, "close")
-                            if asyncio.iscoroutinefunction(close_func):
-                                await close_func()
-                            else:
-                                close_func()
+
                     except Exception as close_err:
                         logger.error(f"Error closing run: {close_err}")
                 yield f"data: {json.dumps({'type': 'end'})}\n\n"
