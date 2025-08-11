@@ -1,5 +1,3 @@
-import os
-
 
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult, DocumentMetadata
