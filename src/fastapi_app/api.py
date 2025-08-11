@@ -459,6 +459,7 @@ async def chat_stream(request: ChatRequest):
 
         async def generate_stream() -> AsyncGenerator[str, None]:
             """Generate streaming response using agent.iter() pattern."""
+            run = None
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
@@ -474,7 +475,9 @@ async def chat_stream(request: ChatRequest):
                     context_str = "\n".join(
                         [f"{msg['role']}: {msg['content']}" for msg in context[-6:]]
                     )
-                    full_prompt = f"Previous conversation:\n{context_str}\n\nCurrent question: {request.message}"
+                    full_prompt = (
+                        f"Previous conversation:\n{context_str}\n\nCurrent question: {request.message}"
+                    )
 
                 # Save user message immediately
                 await add_message(
@@ -487,11 +490,12 @@ async def chat_stream(request: ChatRequest):
                 full_response = ""
 
                 # Stream using agent.iter() pattern
-                async with rag_agent.iter(full_prompt, deps=deps) as run:
-                    async for node in run:
+                async with rag_agent.iter(full_prompt, deps=deps) as run_ctx:
+                    run = run_ctx
+                    async for node in run_ctx:
                         if rag_agent.is_model_request_node(node):
                             # Stream tokens from the model
-                            async with node.stream(run.ctx) as request_stream:
+                            async with node.stream(run_ctx.ctx) as request_stream:
                                 async for event in request_stream:
                                     from pydantic_ai.messages import (
                                         PartStartEvent,
@@ -514,9 +518,12 @@ async def chat_stream(request: ChatRequest):
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                # Extract tools used from the final result
-                result = run.result
-                tools_used = extract_tool_calls(result)
+                if run is not None:
+                    # Extract tools used from the final result
+                    result = run.result
+                    tools_used = extract_tool_calls(result)
+                else:
+                    tools_used = []
 
                 # Send tools used information
                 if tools_used:
@@ -538,12 +545,23 @@ async def chat_stream(request: ChatRequest):
                     metadata={"streamed": True, "tool_calls": len(tools_used)},
                 )
 
-                yield f"data: {json.dumps({'type': 'end'})}\n\n"
-
             except Exception as e:
                 logger.error(f"Stream error: {e}")
-                error_chunk = {"type": "error", "content": f"Stream error: {str(e)}"}
-                yield f"data: {json.dumps(error_chunk)}\n\n"
+                yield (
+                    f"event: error\n"
+                    f"data: {json.dumps({'message': str(e)})}\n\n"
+                )
+            finally:
+                if run is not None:
+                    close = getattr(run, "close", None)
+                    try:
+                        if asyncio.iscoroutinefunction(close):
+                            await close()
+                        elif callable(close):
+                            close()
+                    except Exception as close_err:
+                        logger.error(f"Error closing run: {close_err}")
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
         return StreamingResponse(
             generate_stream(),
