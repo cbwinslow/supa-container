@@ -1,12 +1,11 @@
 """Semantic chunking implementation for intelligent document splitting."""
 
 import re
-import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 import asyncio
 
-logger = logging.getLogger(__name__)
+
 
 # Import flexible providers
 from fastapi_app.providers import get_embedding_client, get_ingestion_model

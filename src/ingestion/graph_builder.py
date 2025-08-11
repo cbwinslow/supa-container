@@ -1,6 +1,6 @@
 """Knowledge graph builder for extracting entities and relationships."""
 
-import logging
+
 from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime, timezone
 import asyncio
@@ -12,8 +12,9 @@ from .chunker import DocumentChunk
 
 # Import graph utilities
 from fastapi_app.graph_utils import GraphitiClient
+from logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+
 
 
 class GraphBuilder:
