@@ -1,3 +1,18 @@
+import os
+os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
+os.environ.setdefault("NEO4J_URI", "bolt://localhost:7687")
+os.environ.setdefault("NEO4J_USER", "neo4j")
+os.environ.setdefault("NEO4J_PASSWORD", "test_password")
+os.environ.setdefault("LLM_PROVIDER", "openai")
+os.environ.setdefault("LLM_BASE_URL", "https://api.openai.com/v1")
+os.environ.setdefault("LLM_API_KEY", "sk-test-key-for-testing")
+os.environ.setdefault("LLM_CHOICE", "gpt-4-turbo-preview")
+os.environ.setdefault("EMBEDDING_PROVIDER", "openai")
+os.environ.setdefault("EMBEDDING_BASE_URL", "https://api.openai.com/v1")
+os.environ.setdefault("EMBEDDING_API_KEY", "sk-test-key-for-testing")
+os.environ.setdefault("EMBEDDING_MODEL", "text-embedding-3-small")
+os.environ.setdefault("INGESTION_LLM_CHOICE", "gpt-4o-mini")
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -28,6 +43,11 @@ def mock_db_utils():
             "add_message": mock_add,
             "get_session_messages": mock_get_messages
         }
+
+
+@pytest.fixture
+def auth_headers():
+    return {"Authorization": "Bearer test-token"}
 
 @pytest.fixture
 def mock_graph_utils():
@@ -66,16 +86,16 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["database"] is True
     assert json_data["graph_database"] is True
 
-async def test_chat_endpoint_creates_session(mock_db_utils, mock_agent_execution):
+async def test_chat_endpoint_creates_session(mock_db_utils, mock_agent_execution, auth_headers):
     mock_db_utils["get_session"].return_value = None # Simulate no existing session
-    response = client.post("/chat", json={"message": "Hello"})
+    response = client.post("/chat", json={"message": "Hello"}, headers=auth_headers)
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "new-session-123"
 
-async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_execution):
-    response = client.post("/chat", json={"message": "Hello again", "session_id": "existing-session-456"})
+async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_execution, auth_headers):
+    response = client.post("/chat", json={"message": "Hello again", "session_id": "existing-session-456"}, headers=auth_headers)
     assert response.status_code == 200
     mock_db_utils["get_session"].assert_called_with("existing-session-456")
     mock_db_utils["create_session"].assert_not_called()
@@ -83,7 +103,12 @@ async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_exe
     assert response.json()["session_id"] == "existing-session-456"
     assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
 
-async def test_chat_stream_endpoint(mock_db_utils):
+
+async def test_chat_requires_auth():
+    response = client.post("/chat", json={"message": "Hello"})
+    assert response.status_code == 401
+
+async def test_chat_stream_endpoint(mock_db_utils, auth_headers):
     # Mock the agent's streaming logic
     with patch('fastapi_app.api.rag_agent.iter') as mock_iter:
         async def mock_streamer(*args, **kwargs):
@@ -95,15 +120,15 @@ async def test_chat_stream_endpoint(mock_db_utils):
         
         mock_iter.return_value.__aenter__.return_value = mock_streamer() # type: ignore
         
-        response = client.post("/chat/stream", json={"message": "stream test"})
+        response = client.post("/chat/stream", json={"message": "stream test"}, headers=auth_headers)
         assert response.status_code == 200
         # In a real test client, you would iterate over the streaming response
         # Here we just confirm the endpoint is reachable and returns a streaming content type
         assert "text/event-stream" in response.headers["content-type"]
 
-async def test_vector_search_endpoint(mock_tools):
+async def test_vector_search_endpoint(mock_tools, auth_headers):
     with patch('fastapi_app.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
-        response = client.post("/search/vector", json={"query": "test"})
+        response = client.post("/search/vector", json={"query": "test"}, headers=auth_headers)
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "vector"
@@ -111,8 +136,8 @@ async def test_vector_search_endpoint(mock_tools):
         assert json_data["results"][0]["content"] == "vector search result"
         mock_tools["vector"].assert_called_once()
 
-async def test_graph_search_endpoint(mock_tools):
-    response = client.post("/search/graph", json={"query": "test"})
+async def test_graph_search_endpoint(mock_tools, auth_headers):
+    response = client.post("/search/graph", json={"query": "test"}, headers=auth_headers)
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["search_type"] == "graph"
@@ -120,9 +145,9 @@ async def test_graph_search_endpoint(mock_tools):
     assert json_data["graph_results"][0]["fact"] == "graph search result"
     mock_tools["graph"].assert_called_once()
 
-async def test_hybrid_search_endpoint(mock_tools):
+async def test_hybrid_search_endpoint(mock_tools, auth_headers):
     with patch('fastapi_app.tools.generate_embedding', new_callable=AsyncMock, return_value=[0.1]*1536):
-        response = client.post("/search/hybrid", json={"query": "test"})
+        response = client.post("/search/hybrid", json={"query": "test"}, headers=auth_headers)
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "hybrid"

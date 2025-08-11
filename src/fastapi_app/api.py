@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional, AsyncGenerator
 from datetime import datetime
 import uuid
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, Header, status
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -27,6 +27,7 @@ from fastapi_app.db_utils import (
     add_message,
     get_session_messages,
     test_connection,
+    verify_token,
 )
 from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
 from fastapi_app.models import (
@@ -197,6 +198,17 @@ async def get_conversation_context(
     messages = await get_session_messages(session_id, limit=max_messages)
 
     return [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+
+
+# Authentication dependency
+async def auth_dependency(authorization: str = Header(None)) -> str:
+    """Simple bearer token authentication."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token")
+    token = authorization.split(" ", 1)[1]
+    if not await verify_token(token):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return token
 
 
 def extract_tool_calls(result: Any) -> List[ToolCall]:
@@ -427,7 +439,7 @@ async def health_check():
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, token: str = Depends(auth_dependency)):
     """Non-streaming chat endpoint."""
     try:
         # Get or create session
@@ -451,7 +463,7 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, token: str = Depends(auth_dependency)):
     """Streaming chat endpoint using Server-Sent Events."""
     try:
         # Get or create session
@@ -561,7 +573,7 @@ async def chat_stream(request: ChatRequest):
 
 
 @app.post("/search/vector")
-async def search_vector(request: SearchRequest):
+async def search_vector(request: SearchRequest, token: str = Depends(auth_dependency)):
     """Vector search endpoint."""
     try:
         input_data = VectorSearchInput(query=request.query, limit=request.limit)
@@ -585,7 +597,7 @@ async def search_vector(request: SearchRequest):
 
 
 @app.post("/search/graph")
-async def search_graph(request: SearchRequest):
+async def search_graph(request: SearchRequest, token: str = Depends(auth_dependency)):
     """Knowledge graph search endpoint."""
     try:
         input_data = GraphSearchInput(query=request.query)
@@ -609,7 +621,7 @@ async def search_graph(request: SearchRequest):
 
 
 @app.post("/search/hybrid")
-async def search_hybrid(request: SearchRequest):
+async def search_hybrid(request: SearchRequest, token: str = Depends(auth_dependency)):
     """Hybrid search endpoint."""
     try:
         input_data = HybridSearchInput(query=request.query, limit=request.limit)

@@ -75,6 +75,15 @@ async def initialize_database():
     await db_pool.initialize()
 
 
+# Authentication utilities
+API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "test-token")
+
+
+async def verify_token(token: str) -> bool:
+    """Verify bearer token for authentication."""
+    return token == API_AUTH_TOKEN
+
+
 async def close_database():
     """Close database connection pool."""
     await db_pool.close()
