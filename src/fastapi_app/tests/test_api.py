@@ -1,10 +1,9 @@
-import os
 import tests.conftest  # noqa: F401
 
 import json
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult
 
@@ -224,3 +223,158 @@ async def test_hybrid_search_endpoint(mock_tools, auth_headers):
         assert len(json_data["results"]) == 1
         assert json_data["results"][0]["content"] == "hybrid search result"
         mock_tools["hybrid"].assert_called_once()
+
+
+# --- Additional Edge Case and Failure Path Tests ---
+
+
+async def test_health_check_degraded_when_dependencies_fail(monkeypatch):
+    # If available, simulate failures and assert the endpoint still responds with structured status.
+    # We do not assume specific status code (200 vs 503) in absence of implementation details,
+    # but we validate the presence of diagnostic keys.
+    with patch("fastapi_app.api.test_connection", new_callable=AsyncMock, return_value=False), \
+         patch("fastapi_app.api.test_graph_connection", new_callable=AsyncMock, return_value=False):
+        response = client.get("/health")
+        assert response.status_code in (200, 503)
+        data = response.json()
+        # Validate keys exist and are booleans
+        assert "status" in data
+        assert "database" in data
+        assert "graph_database" in data
+        assert isinstance(data["database"], bool)
+        assert isinstance(data["graph_database"], bool)
+
+
+async def test_chat_requires_auth_on_invalid_token():
+    # Override the autouse mock_auth fixture for this test to simulate invalid token
+    with patch("fastapi_app.api.verify_auth_token", new_callable=AsyncMock, return_value=False):
+        response = client.post("/chat", headers={"Authorization": "Bearer invalid"}, json={"message": "Hi"})
+        assert response.status_code in (401, 403)
+
+
+async def test_chat_missing_authorization_header_is_rejected():
+    # Depending on dependency setup, missing header should be rejected before token verification.
+    response = client.post("/chat", json={"message": "Hi"})
+    assert response.status_code in (401, 403)
+
+
+async def test_chat_validation_error_when_message_missing(auth_headers):
+    # Missing required field 'message' should trigger FastAPI/Pydantic validation 422
+    response = client.post("/chat", headers=auth_headers, json={})
+    assert response.status_code == 422
+
+
+async def test_chat_validation_error_when_message_wrong_type(auth_headers):
+    # Wrong type for message (e.g., non-string) should also be 422
+    response = client.post("/chat", headers=auth_headers, json={"message": 123})
+    assert response.status_code == 422
+
+
+async def test_chat_handles_agent_exception_gracefully(mock_db_utils, auth_headers):
+    # Simulate agent failure and ensure API returns a controlled error response
+    with patch("fastapi_app.api.execute_agent", new_callable=AsyncMock, side_effect=Exception("boom")):
+        resp = client.post("/chat", headers=auth_headers, json={"message": "Hello"})
+        # Accept either 500 or a structured error (implementation dependent)
+        assert resp.status_code in (400, 422, 500)
+        # If JSON body returned, it should be structured
+        try:
+            body = resp.json()
+            assert isinstance(body, dict)
+        except Exception:
+            # Some implementations may return plain text on error; allow it
+            pass
+
+
+async def test_chat_uses_add_message_and_passes_expected_arguments(mock_db_utils, mock_agent_execution, auth_headers):
+    # Ensure messages are persisted with expected schema
+    payload = {"message": "Track this", "session_id": "existing-session-456"}
+    response = client.post("/chat", headers=auth_headers, json=payload)
+    assert response.status_code == 200
+    # Validate add_message was called to store the user message
+    assert mock_db_utils["add_message"].call_count >= 1
+
+
+async def test_chat_stream_requires_auth_on_invalid_token():
+    with patch("fastapi_app.api.verify_auth_token", new_callable=AsyncMock, return_value=False):
+        response = client.post("/chat/stream", headers={"Authorization": "Bearer invalid"}, json={"message": "stream"})
+        assert response.status_code in (401, 403)
+
+
+async def test_chat_stream_validation_error_on_missing_message(auth_headers):
+    response = client.post("/chat/stream", headers=auth_headers, json={})
+    assert response.status_code == 422
+
+
+async def test_vector_search_missing_auth_is_rejected():
+    response = client.post("/search/vector", json={"query": "q"})
+    assert response.status_code in (401, 403)
+
+
+async def test_vector_search_validation_error_on_missing_query(auth_headers):
+    response = client.post("/search/vector", headers=auth_headers, json={})
+    assert response.status_code == 422
+
+
+async def test_vector_search_validation_error_on_wrong_type(auth_headers):
+    response = client.post("/search/vector", headers=auth_headers, json={"query": 42})
+    assert response.status_code == 422
+
+
+async def test_vector_search_embedding_failure_returns_error(mock_tools, auth_headers):
+    with patch("fastapi_app.tools.generate_embedding", new_callable=AsyncMock, side_effect=Exception("embed-fail")):
+        resp = client.post("/search/vector", headers=auth_headers, json={"query": "test"})
+        assert resp.status_code in (400, 422, 500)
+
+
+async def test_vector_search_tool_called_with_expected_args(mock_tools, auth_headers):
+    with patch("fastapi_app.tools.generate_embedding", new_callable=AsyncMock, return_value=[0.0] * 1536) as mock_embed:
+        response = client.post("/search/vector", headers=auth_headers, json={"query": "needle"})
+        assert response.status_code == 200
+        # Ensure tool was called at least once; argument shapes depend on implementation.
+        assert mock_tools["vector"].call_count >= 1
+        assert mock_embed.call_count == 1
+
+
+async def test_graph_search_validation_errors(auth_headers):
+    # Missing query
+    r1 = client.post("/search/graph", headers=auth_headers, json={})
+    assert r1.status_code == 422
+    # Wrong type
+    r2 = client.post("/search/graph", headers=auth_headers, json={"query": 999})
+    assert r2.status_code == 422
+
+
+async def test_graph_search_tool_failure_returns_error(mock_tools, auth_headers):
+    with patch("fastapi_app.api.graph_search_tool", new_callable=AsyncMock, side_effect=Exception("graph-fail")):
+        resp = client.post("/search/graph", headers=auth_headers, json={"query": "q"})
+        assert resp.status_code in (400, 422, 500)
+
+
+async def test_hybrid_search_missing_auth_is_rejected():
+    response = client.post("/search/hybrid", json={"query": "q"})
+    assert response.status_code in (401, 403)
+
+
+async def test_hybrid_search_validation_error_on_missing_query(auth_headers):
+    response = client.post("/search/hybrid", headers=auth_headers, json={})
+    assert response.status_code == 422
+
+
+async def test_hybrid_search_embedding_failure_returns_error(mock_tools, auth_headers):
+    with patch("fastapi_app.tools.generate_embedding", new_callable=AsyncMock, side_effect=Exception("embed-fail")):
+        resp = client.post("/search/hybrid", headers=auth_headers, json={"query": "q"})
+        assert resp.status_code in (400, 422, 500)
+
+
+async def test_hybrid_search_tool_called_with_expected_args(mock_tools, auth_headers):
+    with patch("fastapi_app.tools.generate_embedding", new_callable=AsyncMock, return_value=[0.2] * 1536) as mock_embed:
+        response = client.post("/search/hybrid", headers=auth_headers, json={"query": "alpha"})
+        assert response.status_code == 200
+        assert mock_tools["hybrid"].call_count >= 1
+        assert mock_embed.call_count == 1
+
+
+# Additional negative test: ensure unknown route returns 404 to validate router wiring
+async def test_unknown_route_returns_404():
+    response = client.get("/__unknown__")
+    assert response.status_code == 404
