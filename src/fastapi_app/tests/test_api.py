@@ -1,6 +1,12 @@
 import os
 
 
+@pytest.fixture(autouse=True)
+def set_env_vars(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
+    monkeypatch.setenv("NEO4J_PASSWORD", "password")
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "embed-key")
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult, DocumentMetadata
 
