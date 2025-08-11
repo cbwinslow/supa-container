@@ -1,15 +1,11 @@
-"""
-Document embedding generation for vector search.
-"""
+"""Document embedding generation for vector search."""
 
-import os
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import json
 
 from openai import RateLimitError, APIError
-from dotenv import load_dotenv
 
 from .chunker import DocumentChunk
 
@@ -17,10 +13,7 @@ from .chunker import DocumentChunk
 from fastapi_app.providers import get_embedding_client, get_embedding_model
 from logging_config import get_logger
 
-# Load environment variables
-load_dotenv()
 
-logger = get_logger(__name__)
 
 # Initialize client with flexible provider
 embedding_client = get_embedding_client()

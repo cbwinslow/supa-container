@@ -13,7 +13,6 @@ from datetime import datetime
 import argparse
 
 import asyncpg
-from dotenv import load_dotenv
 
 from .chunker import ChunkingConfig, create_chunker, DocumentChunk
 from .embedder import create_embedder
@@ -32,9 +31,6 @@ except ImportError:
     from agent.db_utils import initialize_database, close_database, db_pool
     from agent.graph_utils import initialize_graph, close_graph
     from agent.models import IngestionConfig, IngestionResult
-
-# Load environment variables
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,5 @@
-"""
-Document embedding generation for vector search.
-"""
+"""Document embedding generation for vector search."""
 
-import os
 import asyncio
 import logging
 from typing import List, Dict, Any, Optional, Tuple
@@ -10,7 +7,6 @@ from datetime import datetime
 import json
 
 from openai import RateLimitError, APIError
-from dotenv import load_dotenv
 
 from .chunker import DocumentChunk
 
@@ -23,9 +19,6 @@ except ImportError:
     import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from agent.providers import get_embedding_client, get_embedding_model
-
-# Load environment variables
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 

@@ -1,15 +1,12 @@
-"""
-Knowledge graph builder for extracting entities and relationships.
-"""
+"""Knowledge graph builder for extracting entities and relationships."""
 
-import os
+
 from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime, timezone
 import asyncio
 import re
 
 from graphiti_core import Graphiti
-from dotenv import load_dotenv
 
 from .chunker import DocumentChunk
 
@@ -17,10 +14,7 @@ from .chunker import DocumentChunk
 from fastapi_app.graph_utils import GraphitiClient
 from logging_config import get_logger
 
-# Load environment variables
-load_dotenv()
 
-logger = get_logger(__name__)
 
 
 class GraphBuilder:

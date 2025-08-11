@@ -1,15 +1,11 @@
-"""
-Tools for the Pydantic AI agent.
-"""
+"""Tools for the Pydantic AI agent."""
 
-import os
+
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
 
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
-from logging_config import get_logger
 
 from .db_utils import (
     vector_search,
@@ -26,10 +22,6 @@ from .graph_utils import (
 from .models import ChunkResult, GraphSearchResult, DocumentMetadata
 from .providers import get_embedding_client, get_embedding_model
 
-# Load environment variables
-load_dotenv()
-
-logger = get_logger(__name__)
 
 # Initialize embedding client with flexible provider
 embedding_client = get_embedding_client()

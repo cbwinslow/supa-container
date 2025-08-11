@@ -12,7 +12,6 @@ from datetime import datetime
 import argparse
 
 import asyncpg
-from dotenv import load_dotenv
 
 from .chunker import ChunkingConfig, create_chunker, DocumentChunk
 from .embedder import create_embedder
@@ -24,10 +23,7 @@ from fastapi_app.graph_utils import initialize_graph, close_graph
 from fastapi_app.models import IngestionConfig, IngestionResult
 from logging_config import get_logger
 
-# Load environment variables
-load_dotenv()
 
-logger = get_logger(__name__)
 
 
 class DocumentIngestionPipeline:

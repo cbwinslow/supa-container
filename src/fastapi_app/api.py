@@ -1,8 +1,5 @@
-"""
-FastAPI endpoints for the agentic RAG system.
-"""
+"""FastAPI endpoints for the agentic RAG system."""
 
-import os
 import asyncio
 import json
 import logging
@@ -15,7 +12,8 @@ import uuid
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
-from dotenv import load_dotenv
+
+from settings import settings
 
 from logging_config import get_logger
 
@@ -90,24 +88,7 @@ langfuse = Langfuse()
 
 # --- End OpenTelemetry ---
 
-# Load environment variables
-load_dotenv()
 
-logger = get_logger(__name__)
-
-
-def rate_limit_key(request: Request) -> str:
-    """Determine rate limit key based on user ID or IP address."""
-    return request.headers.get("X-User-ID") or get_remote_address(request)
-
-
-limiter = Limiter(key_func=rate_limit_key, default_limits=["100/minute"])
-
-
-# Application configuration
-APP_ENV = os.getenv("APP_ENV", "development")
-APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
-APP_PORT = int(os.getenv("APP_PORT", 8000))
 
 
 # Set debug level for our module during development

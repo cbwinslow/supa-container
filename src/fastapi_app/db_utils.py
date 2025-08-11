@@ -1,8 +1,5 @@
-"""
-Database utilities for PostgreSQL connection and operations.
-"""
+"""Database utilities for PostgreSQL connection and operations."""
 
-import os
 import json
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
@@ -12,11 +9,7 @@ from uuid import UUID
 
 import asyncpg
 from asyncpg.pool import Pool
-from dotenv import load_dotenv
-from logging_config import get_logger
 
-# Load environment variables
-load_dotenv()
 
 logger = get_logger(__name__)
 
@@ -40,7 +33,7 @@ class DatabasePool:
         Args:
             database_url: PostgreSQL connection URL
         """
-        self.database_url = database_url or os.getenv("DATABASE_URL")
+        self.database_url = database_url or settings.database_url
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable not set")
 
