@@ -10,7 +10,21 @@ def _reload_api(monkeypatch, origins=None):
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
     monkeypatch.setenv("NEO4J_PASSWORD", "dummy")
     monkeypatch.setenv("LLM_API_KEY", "dummy")
-    monkeypatch.setenv("EMBEDDING_API_KEY", "dummy")
+# Test environment variable constants
+DATABASE_URL = "postgresql://user:pass@localhost:5432/db"
+NEO4J_PASSWORD = "dummy"
+LLM_API_KEY = "dummy"
+EMBEDDING_API_KEY = "dummy"
+
+def _reload_api(monkeypatch, origins=None):
+    if origins is None:
+        monkeypatch.delenv("ALLOWED_ORIGINS", raising=False)
+    else:
+        monkeypatch.setenv("ALLOWED_ORIGINS", origins)
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
+    monkeypatch.setenv("NEO4J_PASSWORD", NEO4J_PASSWORD)
+    monkeypatch.setenv("LLM_API_KEY", LLM_API_KEY)
+    monkeypatch.setenv("EMBEDDING_API_KEY", EMBEDDING_API_KEY)
     import fastapi_app.api as api_module
     importlib.reload(api_module)
     return api_module
