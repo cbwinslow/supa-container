@@ -37,7 +37,18 @@ def setup_logging() -> None:
         handlers["console"] = {
             "class": "logging.StreamHandler",
             "formatter": log_formatter,
-        }
+        try:
+            import pythonjsonlogger
+            log_formatter = "json"
+            formatters["json"] = {
+                "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+                "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
+            }
+        except ImportError:
+            warnings.warn(
+                "LOG_FORMAT=json requested but python-json-logger is not installed. Falling back to text format.",
+                RuntimeWarning,
+            )
 
     if "file" in LOG_OUTPUT:
         handlers["file"] = {
