@@ -622,8 +622,6 @@ async def health_check():
         logger.error(f"Vector search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
     """Knowledge graph search endpoint."""
     try:
         input_data = GraphSearchInput(query=request.query)

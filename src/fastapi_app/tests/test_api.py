@@ -1,5 +1,6 @@
 import os
 
+
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult, DocumentMetadata
 
@@ -40,10 +41,6 @@ def mock_db_utils():
         }
 
 
-
-@pytest.fixture
-def mock_graph_utils():
-    """Mocks all functions in the graph_utils module."""
 
         yield
 
@@ -108,10 +105,12 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_database"] is True
 
 
+
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "new-session-123"
+
 
 
     assert response.status_code == 200
@@ -138,12 +137,14 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
         assert "text/event-stream" in response.headers["content-type"]
 
 
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "vector"
         assert len(json_data["results"]) == 1
         assert json_data["results"][0]["content"] == "vector search result"
         mock_tools["vector"].assert_called_once()
+
 
 
     assert response.status_code == 200
@@ -154,11 +155,13 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     mock_tools["graph"].assert_called_once()
 
 
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "hybrid"
         assert len(json_data["results"]) == 1
         assert json_data["results"][0]["content"] == "hybrid search result"
         mock_tools["hybrid"].assert_called_once()
+
 
 
