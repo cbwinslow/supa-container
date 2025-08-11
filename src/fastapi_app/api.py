@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
 
-from settings import settings
+from ..settings import settings
 
 from fastapi_app.agent import rag_agent, AgentDependencies
 from fastapi_app.db_utils import (
