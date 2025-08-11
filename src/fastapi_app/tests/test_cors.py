@@ -31,10 +31,14 @@ def _reload_api(monkeypatch, origins=None):
 
 
 def _get_cors_origins(app):
-    for m in app.user_middleware:
-        if m.cls.__name__ == "CORSMiddleware":
-            return m.kwargs.get("allow_origins")
-    return None
+    return next(
+        (
+            m.kwargs.get("allow_origins")
+            for m in app.user_middleware
+            if m.cls.__name__ == "CORSMiddleware"
+        ),
+        None,
+    )
 
 
 def test_cors_default_blocks(monkeypatch):
