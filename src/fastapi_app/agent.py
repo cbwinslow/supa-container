@@ -3,11 +3,11 @@ Main Pydantic AI agent for agentic RAG with knowledge graph.
 """
 
 import os
-import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
 from pydantic_ai import Agent, RunContext
+
 
 from fastapi_app.prompts import SYSTEM_PROMPT
 from fastapi_app.providers import get_llm_model
@@ -28,7 +28,7 @@ from fastapi_app.tools import (
     EntityTimelineInput
 )
 
-logger = logging.getLogger(__name__)
+
 
 
 @dataclass
