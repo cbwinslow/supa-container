@@ -35,7 +35,6 @@ from fastapi_app.models import (
     DocumentListRequest,
     DocumentListResponse,
     StreamDelta,
-    ErrorResponse,
     HealthStatus,
     ToolCall,
     Session,
@@ -724,19 +723,19 @@ async def get_session_info(session_id: str):
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
-    request_id = str(uuid.uuid4())
-    details = getattr(exc, "detail", None)
+    request_id = getattr(exc, "request_id", str(uuid.uuid4()))
+    details = getattr(exc, "detail", getattr(exc, "details", None))
     if details is not None and not isinstance(details, dict):
         details = {"detail": details}
 
-    error_response = ErrorResponse(
-        error=str(exc),
-        error_type=type(exc).__name__,
-        details=details,
-        request_id=request_id,
-    )
+    content = {
+        "error": str(exc),
+        "error_type": type(exc).__name__,
+        "details": details,
+        "request_id": request_id,
+    }
 
-    return JSONResponse(status_code=500, content=error_response.model_dump())
+    return JSONResponse(status_code=500, content=content)
 
 
 # Development server
