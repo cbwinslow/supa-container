@@ -3,13 +3,13 @@ Tools for the Pydantic AI agent.
 """
 
 import os
-import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
 
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from logging_config import get_logger
 
 from .db_utils import (
     vector_search,
@@ -29,7 +29,7 @@ from .providers import get_embedding_client, get_embedding_model
 # Load environment variables
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Initialize embedding client with flexible provider
 embedding_client = get_embedding_client()

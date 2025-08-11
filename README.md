@@ -11,7 +11,7 @@ This repository provides a one-click deployment script to set up the entire cont
 -   **Advanced AI Backend:**
     -   **Agentic Framework:** A custom Python backend using Pydantic AI that can reason and use tools.
     -   **Hybrid RAG:** Combines semantic vector search (via Supabase/pgvector) with a temporal **Knowledge Graph** (via Neo4j) for deep, contextual analysis.
-    -   **Secure API:** A robust FastAPI backend with endpoints for ingestion, streaming chat, and model management.
+    -   **Secure API:** A robust FastAPI backend with endpoints for ingestion, streaming chat, model management, and built-in rate limiting.
 -   **Polished User Interface:**
     -   **ChatGPT-like Experience:** A Next.js frontend with a full chat interface, conversation history, and Markdown/code rendering.
     -   **Supabase Auth:** Secure user authentication (login, signup, etc.) managed by Supabase.
@@ -107,6 +107,4 @@ Your application is now fully deployed and operational!
 -   **Observability (Jaeger):** `https://jaeger.your-domain.com`
 -   **Traefik Dashboard:** `https://traefik.your-domain.com`
 
-## Environment Variables
 
--   `ALLOWED_ORIGINS`: Comma-separated list of origins permitted for CORS requests to the FastAPI backend. Defaults to disallow all cross-origin requests.
