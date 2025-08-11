@@ -35,4 +35,15 @@ def test_cors_env_allows_list(monkeypatch):
         "https://foo.com",
     ]
     # Reset module to default state for other tests
-    _reload_api(monkeypatch)
+def test_cors_default_blocks(api_module_fixture):
+    api_module = api_module_fixture
+    assert _get_cors_origins(api_module.app) == []
+
+
+@pytest.mark.parametrize("api_module_fixture", ["https://example.com, https://foo.com"], indirect=True)
+def test_cors_env_allows_list(api_module_fixture):
+    api_module = api_module_fixture
+    assert _get_cors_origins(api_module.app) == [
+        "https://example.com",
+        "https://foo.com",
+    ]
