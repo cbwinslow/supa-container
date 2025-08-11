@@ -12,7 +12,7 @@ from datetime import datetime
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
@@ -673,10 +673,19 @@ async def get_session_info(session_id: str):
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
+    request_id = str(uuid.uuid4())
+    details = getattr(exc, "detail", None)
+    if details is not None and not isinstance(details, dict):
+        details = {"detail": details}
 
-    return ErrorResponse(
-        error=str(exc), error_type=type(exc).__name__, request_id=str(uuid.uuid4())
+    error_response = ErrorResponse(
+        error=str(exc),
+        error_type=type(exc).__name__,
+        details=details,
+        request_id=request_id,
     )
+
+    return JSONResponse(status_code=500, content=error_response.model_dump())
 
 
 # Development server
