@@ -40,7 +40,6 @@ class FeedbackOrchestrator:
         other monitoring files available to the application.
         """
         logger.debug("Collecting feedback signals")
-        await asyncio.sleep(0)  # yield control in async contexts
         return {
             "logs": [],
             "metrics": {},
