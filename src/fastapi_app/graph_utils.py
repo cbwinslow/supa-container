@@ -4,7 +4,6 @@ Graph utilities for Neo4j/Graphiti integration.
 
 import os
 import json
-import logging
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -17,11 +16,12 @@ from graphiti_core.llm_client.openai_client import OpenAIClient
 from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from dotenv import load_dotenv
+from logging_config import get_logger
 
 # Load environment variables
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Help from this PR for setting up the custom clients: https://github.com/getzep/graphiti/pull/601/files
 class GraphitiClient:
