@@ -9,6 +9,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.models.openai import OpenAIModel
 import openai
 from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +90,7 @@ def validate_configuration() -> bool:
     Validate that required environment variables are set.
 
     Returns:
-        True if configuration is valid
-    Raises:
-        RuntimeError: If any required variables are missing
+
     """
     required_vars = [
         "LLM_API_KEY",
@@ -100,18 +99,9 @@ def validate_configuration() -> bool:
         "EMBEDDING_MODEL",
     ]
 
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
 
-    if missing_vars:
-        logger.error(
-            "Missing required environment variables: %s", ", ".join(missing_vars)
-        )
-        raise RuntimeError(
-            f"Missing required environment variables: {', '.join(missing_vars)}"
-        )
 
     return True
-
 
 def get_model_info() -> dict:
     """
@@ -126,6 +116,5 @@ def get_model_info() -> dict:
         "llm_base_url": os.getenv("LLM_BASE_URL"),
         "embedding_provider": get_embedding_provider(),
         "embedding_model": get_embedding_model(),
-        "embedding_base_url": os.getenv("EMBEDDING_BASE_URL"),
-        "ingestion_model": os.getenv("INGESTION_LLM_CHOICE", "same as main"),
+
     }
