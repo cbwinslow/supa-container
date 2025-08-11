@@ -555,7 +555,29 @@ async def chat_stream(request: ChatRequest):
                             else:
                                 close_func()
                         except Exception as close_err:
-                            logger.error(f"Error closing run: {close_err}")
+                    try:
+                        # Prefer aclose only if run is an async generator or async context manager
+                        if inspect.isasyncgen(run):
+                            await run.aclose()
+                        elif hasattr(run, "__aexit__"):
+                            # If it's an async context manager, call aclose if present
+                            aclose_func = getattr(run, "aclose", None)
+                            if aclose_func and asyncio.iscoroutinefunction(aclose_func):
+                                await aclose_func()
+                            elif hasattr(run, "close"):
+                                close_func = getattr(run, "close")
+                                if asyncio.iscoroutinefunction(close_func):
+                                    await close_func()
+                                else:
+                                    close_func()
+                        elif hasattr(run, "close"):
+                            close_func = getattr(run, "close")
+                            if asyncio.iscoroutinefunction(close_func):
+                                await close_func()
+                            else:
+                                close_func()
+                    except Exception as close_err:
+                        logger.error(f"Error closing run: {close_err}")
                 yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
         return StreamingResponse(
