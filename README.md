@@ -106,3 +106,7 @@ Your application is now fully deployed and operational!
 -   **LLM Observability (Langfuse):** `https://langfuse.your-domain.com`
 -   **Observability (Jaeger):** `https://jaeger.your-domain.com`
 -   **Traefik Dashboard:** `https://traefik.your-domain.com`
+
+## Environment Variables
+
+-   `ALLOWED_ORIGINS`: Comma-separated list of origins permitted for CORS requests to the FastAPI backend. Defaults to disallow all cross-origin requests.
