@@ -8,18 +8,11 @@ from typing import Dict, Any, List, Optional, AsyncGenerator
 from datetime import datetime
 import uuid
 
-from fastapi import (
-    FastAPI,
-    HTTPException,
-    Request,
-    Depends,
-    Header,
-    status,
-)
-from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import uvicorn
 
 from logging_config import get_logger
@@ -45,7 +38,6 @@ from fastapi_app.models import (
     DocumentListRequest,
     DocumentListResponse,
     StreamDelta,
-    ErrorResponse,
     HealthStatus,
     ToolCall,
     Session,
@@ -107,10 +99,9 @@ langfuse = Langfuse()
 
 # --- End OpenTelemetry ---
 
-
-
-
-
+logger = logging.getLogger(__name__)
+limiter = Limiter(key_func=get_remote_address)
+security = HTTPBearer()
 
 
 async def auth_dependency(
@@ -507,7 +498,8 @@ async def health_check():
 
 
 @app.post("/chat", response_model=ChatResponse)
-
+async def chat(chat_request: ChatRequest):
+    """Chat endpoint."""
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
@@ -532,13 +524,14 @@ async def health_check():
 
 
 @app.post("/chat/stream")
-
+async def chat_stream(chat_request: ChatRequest):
+    """Streaming chat endpoint using Server-Sent Events."""
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
 
         async def generate_stream() -> AsyncGenerator[str, None]:
-
+            run = None
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
@@ -556,7 +549,9 @@ async def health_check():
                     context_str = "\n".join(
                         [f"{msg['role']}: {msg['content']}" for msg in context[-6:]]
                     )
-
+                    full_prompt = (
+                        f"Previous conversation:\n{context_str}\n\nCurrent question: {chat_request.message}"
+                    )
 
                 # Save user message immediately
                 await add_message(
@@ -569,7 +564,10 @@ async def health_check():
                 full_response = ""
 
                 # Stream using agent.iter() pattern
-
+                async with rag_agent.iter(full_prompt, deps=deps) as run:
+                    async for node in run:
+                        if rag_agent.is_model_request_node(node):
+                            async with node.stream(run.ctx) as request_stream:
                                 async for event in request_stream:
                                     from pydantic_ai.messages import (
                                         PartStartEvent,
@@ -622,7 +620,12 @@ async def health_check():
 
             except Exception as e:
                 logger.error(f"Stream error: {e}")
-
+                error_chunk = {"type": "error", "content": str(e)}
+                yield f"data: {json.dumps(error_chunk)}\n\n"
+            finally:
+                if run is not None:
+                    try:
+                        await run.close()
                     except Exception as close_err:
                         logger.error(f"Error closing run: {close_err}")
                 yield f"data: {json.dumps({'type': 'end'})}\n\n"
@@ -750,19 +753,19 @@ async def get_session_info(session_id: str):
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
-    request_id = str(uuid.uuid4())
-    details = getattr(exc, "detail", None)
+    request_id = getattr(exc, "request_id", str(uuid.uuid4()))
+    details = getattr(exc, "detail", getattr(exc, "details", None))
     if details is not None and not isinstance(details, dict):
         details = {"detail": details}
 
-    error_response = ErrorResponse(
-        error=str(exc),
-        error_type=type(exc).__name__,
-        details=details,
-        request_id=request_id,
-    )
+    content = {
+        "error": str(exc),
+        "error_type": type(exc).__name__,
+        "details": details,
+        "request_id": request_id,
+    }
 
-    return JSONResponse(status_code=500, content=error_response.model_dump())
+    return JSONResponse(status_code=500, content=content)
 
 
 # Development server
