@@ -58,6 +58,7 @@ The application is a complex, multi-service, containerized system. Understanding
     -   **Langfuse:** Provides deep observability into the performance and quality of the LLM agent.
     -   **Promtail & Loki:** Aggregate logs from all services, including Traefik's traffic logs.
     -   **Grafana:** The central dashboard for visualizing all monitoring data.
+    -   **Feedback Orchestrator:** Consumes logs, monitoring exports and database signals to deploy specialised agents for self-healing.
 
 ## 3. Key Files & Conventions
 

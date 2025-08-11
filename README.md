@@ -11,7 +11,7 @@ This repository provides a one-click deployment script to set up the entire cont
 -   **Advanced AI Backend:**
     -   **Agentic Framework:** A custom Python backend using Pydantic AI that can reason and use tools.
     -   **Hybrid RAG:** Combines semantic vector search (via Supabase/pgvector) with a temporal **Knowledge Graph** (via Neo4j) for deep, contextual analysis.
-    -   **Secure API:** A robust FastAPI backend with endpoints for ingestion, streaming chat, and model management.
+    -   **Secure API:** A robust FastAPI backend with endpoints for ingestion, streaming chat, model management, and built-in rate limiting.
 -   **Polished User Interface:**
     -   **ChatGPT-like Experience:** A Next.js frontend with a full chat interface, conversation history, and Markdown/code rendering.
     -   **Supabase Auth:** Secure user authentication (login, signup, etc.) managed by Supabase.
@@ -24,6 +24,7 @@ This repository provides a one-click deployment script to set up the entire cont
     -   **Unified Dashboards (Grafana):** A single pane of glass for all metrics, logs, and traces.
     -   **Security Auditing:** A database-level audit log tracks all user actions.
     -   **Traffic Monitoring:** Traefik access logs are captured for security and performance analysis.
+    -   **Self-Healing Feedback:** An AI orchestrator analyses logs, monitoring exports and database state to launch specialised agents for automatic remediation.
 -   **Integrated Tooling:**
     -   **AI Prototyping Lab (Flowise):** A low-code UI for rapidly building and testing new AI flows.
     -   **Workflow Automation (n8n):** An integrated n8n instance for connecting your AI to other services.
@@ -105,3 +106,5 @@ Your application is now fully deployed and operational!
 -   **LLM Observability (Langfuse):** `https://langfuse.your-domain.com`
 -   **Observability (Jaeger):** `https://jaeger.your-domain.com`
 -   **Traefik Dashboard:** `https://traefik.your-domain.com`
+
+
