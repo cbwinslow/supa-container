@@ -1,14 +1,10 @@
-"""
-Main Pydantic AI agent for agentic RAG with knowledge graph.
-"""
+"""Main Pydantic AI agent for agentic RAG with knowledge graph."""
 
-import os
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
 from pydantic_ai import Agent, RunContext
-from dotenv import load_dotenv
 
 from .prompts import SYSTEM_PROMPT
 from .providers import get_llm_model
@@ -28,9 +24,6 @@ from .tools import (
     EntityRelationshipInput,
     EntityTimelineInput
 )
-
-# Load environment variables
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 

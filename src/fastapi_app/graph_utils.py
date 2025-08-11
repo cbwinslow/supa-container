@@ -1,10 +1,6 @@
-"""
-Graph utilities for Neo4j/Graphiti integration.
-"""
+"""Graph utilities for Neo4j/Graphiti integration."""
 
-import os
 import json
-import logging
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -16,12 +12,12 @@ from graphiti_core.llm_client.config import LLMConfig
 from graphiti_core.llm_client.openai_client import OpenAIClient
 from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
 
-logger = logging.getLogger(__name__)
+
+from settings import settings
+
+logger = get_logger(__name__)
 
 # Help from this PR for setting up the custom clients: https://github.com/getzep/graphiti/pull/601/files
 class GraphitiClient:
@@ -42,27 +38,27 @@ class GraphitiClient:
             neo4j_password: Neo4j password
         """
         # Neo4j configuration
-        self.neo4j_uri = neo4j_uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        self.neo4j_user = neo4j_user or os.getenv("NEO4J_USER", "neo4j")
-        self.neo4j_password = neo4j_password or os.getenv("NEO4J_PASSWORD")
+        self.neo4j_uri = neo4j_uri or settings.neo4j_uri
+        self.neo4j_user = neo4j_user or settings.neo4j_user
+        self.neo4j_password = neo4j_password or settings.neo4j_password
         
         if not self.neo4j_password:
             raise ValueError("NEO4J_PASSWORD environment variable not set")
         
         # LLM configuration
-        self.llm_base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
-        self.llm_api_key = os.getenv("LLM_API_KEY")
-        self.llm_choice = os.getenv("LLM_CHOICE", "gpt-4.1-mini")
+        self.llm_base_url = settings.llm_base_url
+        self.llm_api_key = settings.llm_api_key
+        self.llm_choice = settings.llm_choice
         
         if not self.llm_api_key:
             raise ValueError("LLM_API_KEY environment variable not set")
         
         # Embedding configuration
-        self.embedding_base_url = os.getenv("EMBEDDING_BASE_URL", "https://api.openai.com/v1")
-        self.embedding_api_key = os.getenv("EMBEDDING_API_KEY")
-        self.embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-        self.embedding_dimensions = int(os.getenv("VECTOR_DIMENSION", "1536"))
-        
+        self.embedding_base_url = settings.embedding_base_url
+        self.embedding_api_key = settings.embedding_api_key or settings.llm_api_key
+        self.embedding_model = settings.embedding_model
+        self.embedding_dimensions = settings.vector_dimension
+
         if not self.embedding_api_key:
             raise ValueError("EMBEDDING_API_KEY environment variable not set")
         
