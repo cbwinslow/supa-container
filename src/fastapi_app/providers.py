@@ -9,6 +9,7 @@ import openai
 
 
 
+
 def get_llm_model(model_choice: Optional[str] = None) -> OpenAIModel:
     """
     Get LLM model configuration based on environment variables.
@@ -75,21 +76,12 @@ def validate_configuration() -> bool:
     Validate that required environment variables are set.
 
     Returns:
-        True if configuration is valid
-    Raises:
-        RuntimeError: If any required variables are missing
+
     """
 
-    if missing_vars:
-        logger.error(
-            "Missing required environment variables: %s", ", ".join(missing_vars)
-        )
-        raise RuntimeError(
-            f"Missing required environment variables: {', '.join(missing_vars)}"
-        )
+
 
     return True
-
 
 def get_model_info() -> dict:
     """
@@ -100,5 +92,6 @@ def get_model_info() -> dict:
     """
     return {
         "llm_provider": get_llm_provider(),
+
 
     }

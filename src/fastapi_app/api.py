@@ -90,6 +90,7 @@ langfuse = Langfuse()
 
 
 
+
 # Set debug level for our module during development
 if APP_ENV == "development":
     logger.setLevel(logging.DEBUG)
@@ -169,7 +170,7 @@ FastAPIInstrumentor.instrument_app(app)
 # Add middleware with flexible CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -709,10 +710,19 @@ async def get_session_info(session_id: str):
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
+    request_id = str(uuid.uuid4())
+    details = getattr(exc, "detail", None)
+    if details is not None and not isinstance(details, dict):
+        details = {"detail": details}
 
-    return ErrorResponse(
-        error=str(exc), error_type=type(exc).__name__, request_id=str(uuid.uuid4())
+    error_response = ErrorResponse(
+        error=str(exc),
+        error_type=type(exc).__name__,
+        details=details,
+        request_id=request_id,
     )
+
+    return JSONResponse(status_code=500, content=error_response.model_dump())
 
 
 # Development server
