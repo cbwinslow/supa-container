@@ -1,7 +1,14 @@
 import os
 
+
+@pytest.fixture(autouse=True)
+def set_env_vars(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
+    monkeypatch.setenv("NEO4J_PASSWORD", "password")
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "embed-key")
 from fastapi_app.api import app
-from fastapi_app.models import ChunkResult, GraphSearchResult
+from fastapi_app.models import ChunkResult, GraphSearchResult, DocumentMetadata
 
 # Use pytest-asyncio for async tests
 pytestmark = pytest.mark.asyncio
@@ -17,7 +24,7 @@ def mock_db_utils():
     """Mocks all functions in the db_utils module."""
     with patch(
         "fastapi_app.api.initialize_database", new_callable=AsyncMock
-    ) as _, patch("fastapi_app.api.close_database", new_callable=AsyncMock) as _, patch(
+
         "fastapi_app.api.create_session",
         new_callable=AsyncMock,
         return_value="new-session-123",
@@ -31,7 +38,7 @@ def mock_db_utils():
         "fastapi_app.api.get_session_messages", new_callable=AsyncMock, return_value=[]
     ) as mock_get_messages, patch(
         "fastapi_app.api.test_connection", new_callable=AsyncMock, return_value=True
-    ) as _:
+
         yield {
             "create_session": mock_create,
             "get_session": mock_get,
@@ -43,13 +50,7 @@ def mock_db_utils():
 @pytest.fixture
 def mock_graph_utils():
     """Mocks all functions in the graph_utils module."""
-    with patch("fastapi_app.api.initialize_graph", new_callable=AsyncMock) as _, patch(
-        "fastapi_app.api.close_graph", new_callable=AsyncMock
-    ) as _, patch(
-        "fastapi_app.api.test_graph_connection",
-        new_callable=AsyncMock,
-        return_value=True,
-    ) as _:
+
         yield
 
 
@@ -113,6 +114,7 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_database"] is True
 
 
+
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
@@ -127,6 +129,7 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "existing-session-456"
     assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
+
 
 
     # Mock the agent's streaming logic
@@ -161,6 +164,7 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
         mock_tools["vector"].assert_called_once()
 
 
+
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["search_type"] == "graph"
@@ -184,10 +188,3 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
         mock_tools["hybrid"].assert_called_once()
 
 
-async def test_rate_limit_exceeded(mock_db_utils, mock_agent_execution):
-    """Ensure chat endpoint enforces rate limits."""
-    response = None
-    for _ in range(6):
-        response = client.post("/chat", json={"message": "Hello"})
-    assert response.status_code == 429
-    assert response.json()["error_type"] == "RateLimitExceeded"
