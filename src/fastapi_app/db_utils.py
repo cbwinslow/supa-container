@@ -85,7 +85,9 @@ async def initialize_database():
 
 
 # Authentication utilities
-API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "test-token")
+API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN")
+if not API_AUTH_TOKEN:
+    raise ValueError("API_AUTH_TOKEN environment variable must be set for authentication")
 
 
 async def verify_token(token: str) -> bool:
