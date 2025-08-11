@@ -1,0 +1,3 @@
+- Refactor `api.py` to remove unreachable sections and reintroduce missing endpoint definitions.
+- Add tests verifying SSE error and end events in `generate_stream`.
+- Validate test modules for syntax errors so automated checks run cleanly.

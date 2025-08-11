@@ -1,12 +1,6 @@
-import os
-import tests.conftest  # noqa: F401
 
-import json
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi_app.api import app
-from fastapi_app.models import ChunkResult, GraphSearchResult
+from fastapi_app.models import ChunkResult, GraphSearchResult, DocumentMetadata
 
 # Use pytest-asyncio for async tests
 pytestmark = pytest.mark.asyncio
@@ -16,26 +10,21 @@ client = TestClient(app)
 # --- Mocks and Fixtures ---
 
 
-@pytest.fixture(autouse=True)
-def mock_auth():
-    """Mock authentication dependency to always succeed."""
-    with patch(
-        "fastapi_app.api.verify_auth_token", new_callable=AsyncMock, return_value=True
-    ):
-        yield
-
-
-@pytest.fixture
-def auth_headers():
-    return {"Authorization": "Bearer testtoken"}
-
 
 @pytest.fixture
 def mock_db_utils():
-    """Mocks all functions in the db_utils module."""
+    """
+    Pytest fixture that patches database-related functions used by the API and yields their mocks.
+    
+    Patches (as AsyncMock) initialize_database, close_database, create_session, get_session, add_message,
+    get_session_messages, and test_connection in fastapi_app.api. Provides configured return values for
+    create_session ("new-session-123"), get_session ({"id": "existing-session-456"}), get_session_messages ([]),
+    and test_connection (True). Yields a dict with keys "create_session", "get_session", "add_message", and
+    "get_session_messages" mapped to their respective AsyncMock objects for use in assertions.
+    """
     with patch(
         "fastapi_app.api.initialize_database", new_callable=AsyncMock
-    ) as _, patch("fastapi_app.api.close_database", new_callable=AsyncMock) as _, patch(
+
         "fastapi_app.api.create_session",
         new_callable=AsyncMock,
         return_value="new-session-123",
@@ -49,7 +38,7 @@ def mock_db_utils():
         "fastapi_app.api.get_session_messages", new_callable=AsyncMock, return_value=[]
     ) as mock_get_messages, patch(
         "fastapi_app.api.test_connection", new_callable=AsyncMock, return_value=True
-    ) as _:
+
         yield {
             "create_session": mock_create,
             "get_session": mock_get,
@@ -58,22 +47,19 @@ def mock_db_utils():
         }
 
 
-@pytest.fixture
-def mock_graph_utils():
-    """Mocks all functions in the graph_utils module."""
-    with patch("fastapi_app.api.initialize_graph", new_callable=AsyncMock) as _, patch(
-        "fastapi_app.api.close_graph", new_callable=AsyncMock
-    ) as _, patch(
-        "fastapi_app.api.test_graph_connection",
-        new_callable=AsyncMock,
-        return_value=True,
-    ) as _:
+
         yield
 
 
 @pytest.fixture
 def mock_agent_execution():
-    """Mocks the core agent execution logic."""
+    """
+    Pytest fixture that patches fastapi_app.api.execute_agent with an AsyncMock.
+    
+    The mock is configured to return a two-element tuple: a string ("Mocked AI response")
+    and a list of tool-usage dictionaries ([{"tool_name": "vector_search", "args": {"query": "Hello"}}]).
+    Yields the AsyncMock so tests can assert calls and adjust return_value if needed.
+    """
     with patch("fastapi_app.api.execute_agent", new_callable=AsyncMock) as mock_execute:
         mock_execute.return_value = (
             "Mocked AI response",
@@ -84,7 +70,17 @@ def mock_agent_execution():
 
 @pytest.fixture
 def mock_tools():
-    """Mocks the individual search tools."""
+    """
+    Pytest fixture that patches the three search tools (vector, graph, hybrid) and yields their mocks.
+    
+    Each patched tool is an AsyncMock returning deterministic results:
+    - vector: a single ChunkResult with content "vector search result".
+    - graph: a single GraphSearchResult with fact "graph search result".
+    - hybrid: a single ChunkResult with content "hybrid search result".
+    
+    Yields:
+        dict: {'vector': mock_vector, 'graph': mock_graph, 'hybrid': mock_hybrid} — the AsyncMock objects for assertions.
+    """
     with patch(
         "fastapi_app.api.vector_search_tool",
         new_callable=AsyncMock,
@@ -131,25 +127,14 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_database"] is True
 
 
-async def test_chat_endpoint_creates_session(
-    mock_db_utils, mock_agent_execution, auth_headers
-):
-    mock_db_utils["get_session"].return_value = None  # Simulate no existing session
-    response = client.post("/chat", headers=auth_headers, json={"message": "Hello"})
+
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "new-session-123"
 
 
-async def test_chat_endpoint_uses_existing_session(
-    mock_db_utils, mock_agent_execution, auth_headers
-):
-    response = client.post(
-        "/chat",
-        headers=auth_headers,
-        json={"message": "Hello again", "session_id": "existing-session-456"},
-    )
+
     assert response.status_code == 200
     mock_db_utils["get_session"].assert_called_with("existing-session-456")
     mock_db_utils["create_session"].assert_not_called()
@@ -158,37 +143,35 @@ async def test_chat_endpoint_uses_existing_session(
     assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
 
 
-async def test_chat_stream_endpoint(mock_db_utils, auth_headers):
     # Mock the agent's streaming logic
     with patch("fastapi_app.api.rag_agent.iter") as mock_iter:
 
         async def mock_streamer(*args, **kwargs):
+            """
+            Async test streamer that yields a fixed sequence of Server-Sent Events (SSE)-formatted strings.
+            
+            Yields five SSE `data:` events (as strings), in order:
+            1. A `session` event with session_id "stream-session-789".
+            2. A `text` event with content "Hello ".
+            3. A `text` event with content "World!".
+            4. A `tools` event containing a tools list with one tool_name "test_tool".
+            5. An `end` event.
+            
+            Each yielded value is a complete SSE data frame (JSON payload prefixed with "data: " and terminated by a double newline). Intended for use in tests that consume streaming responses.
+            """
             yield f"data: {json.dumps({'type': 'session', 'session_id': 'stream-session-789'})}\n\n"
             yield f"data: {json.dumps({'type': 'text', 'content': 'Hello '})}\n\n"
             yield f"data: {json.dumps({'type': 'text', 'content': 'World!'})}\n\n"
             yield f"data: {json.dumps({'type': 'tools', 'tools': [{'tool_name': 'test_tool'}]})}\n\n"
             yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
-        mock_iter.return_value.__aenter__.return_value = mock_streamer()  # type: ignore
-
-        response = client.post(
-            "/chat/stream", headers=auth_headers, json={"message": "stream test"}
-        )
         assert response.status_code == 200
         # In a real test client, you would iterate over the streaming response
         # Here we just confirm the endpoint is reachable and returns a streaming content type
         assert "text/event-stream" in response.headers["content-type"]
 
 
-async def test_vector_search_endpoint(mock_tools, auth_headers):
-    with patch(
-        "fastapi_app.tools.generate_embedding",
-        new_callable=AsyncMock,
-        return_value=[0.1] * 1536,
-    ):
-        response = client.post(
-            "/search/vector", headers=auth_headers, json={"query": "test"}
-        )
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "vector"
@@ -197,10 +180,7 @@ async def test_vector_search_endpoint(mock_tools, auth_headers):
         mock_tools["vector"].assert_called_once()
 
 
-async def test_graph_search_endpoint(mock_tools, auth_headers):
-    response = client.post(
-        "/search/graph", headers=auth_headers, json={"query": "test"}
-    )
+
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["search_type"] == "graph"
@@ -209,18 +189,13 @@ async def test_graph_search_endpoint(mock_tools, auth_headers):
     mock_tools["graph"].assert_called_once()
 
 
-async def test_hybrid_search_endpoint(mock_tools, auth_headers):
-    with patch(
-        "fastapi_app.tools.generate_embedding",
-        new_callable=AsyncMock,
-        return_value=[0.1] * 1536,
-    ):
-        response = client.post(
-            "/search/hybrid", headers=auth_headers, json={"query": "test"}
-        )
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "hybrid"
         assert len(json_data["results"]) == 1
         assert json_data["results"][0]["content"] == "hybrid search result"
         mock_tools["hybrid"].assert_called_once()
+
+
+

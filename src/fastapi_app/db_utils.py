@@ -1,33 +1,25 @@
-"""
-Database utilities for PostgreSQL connection and operations.
-"""
+"""Database utilities for PostgreSQL connection and operations."""
 
-import os
 import json
 import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from uuid import UUID
-import logging
 
 import asyncpg
 from asyncpg.pool import Pool
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+from logging_config import get_logger
+from settings import settings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+API_AUTH_TOKEN = settings.api_auth_token
 
 
 async def verify_auth_token(token: str) -> bool:
-    """Verify bearer token using environment variable."""
-    expected = os.getenv("API_AUTH_TOKEN")
-    if not expected:
-        logger.warning("API_AUTH_TOKEN not set")
-        return False
-    return token == expected
+    """Verify bearer token against configured token."""
+    return token == API_AUTH_TOKEN
 
 
 class DatabasePool:
@@ -40,7 +32,7 @@ class DatabasePool:
         Args:
             database_url: PostgreSQL connection URL
         """
-        self.database_url = database_url or os.getenv("DATABASE_URL")
+        self.database_url = database_url or settings.database_url
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable not set")
 
@@ -82,6 +74,14 @@ db_pool = DatabasePool()
 async def initialize_database():
     """Initialize database connection pool."""
     await db_pool.initialize()
+
+
+# Authentication utilities
+
+
+async def verify_token(token: str) -> bool:
+    """Verify bearer token for authentication."""
+    return token == API_AUTH_TOKEN
 
 
 async def close_database():
