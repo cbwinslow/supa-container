@@ -4,17 +4,24 @@ Supa-Container is a complete, production-grade platform for building, deploying,
 
 This repository provides a one-click deployment script to set up the entire containerized environment on your server.
 
-## 🚀 Quick Start for opendiscourse.net
+## 🚀 Quick Start - One-Click Hetzner Deployment
 
-**Ready for immediate production deployment on Hetzner!**
+**Ready for immediate production deployment on Hetzner Cloud!**
 
 ```bash
-git clone https://github.com/cbwinslow/hetzner_app.git
-cd hetzner_app
-sudo bash deploy-master.sh
+git clone https://github.com/cbwinslow/supa-container.git
+cd supa-container
+sudo bash one_click_deploy.sh yourdomain.com admin@yourdomain.com
 ```
 
-📖 **[Complete Deployment Guide](README-DEPLOYMENT.md)** - Production deployment with AI orchestrator and specialized agents
+🎯 **That's it!** The script handles everything automatically:
+- ✅ System optimization for Hetzner Cloud
+- ✅ Security hardening (firewall, SSL, fail2ban)  
+- ✅ AI orchestrator with autonomous agents
+- ✅ Complete observability stack
+- ✅ Production-ready configuration
+
+📖 **[Complete Deployment Guide](README_HETZNER_DEPLOYMENT.md)** - Detailed documentation for production deployment
 
 ---
 
@@ -45,78 +52,115 @@ sudo bash deploy-master.sh
 
 ## Deployment Walkthrough
 
-Deploying this platform is now a simple, four-step process.
+Deploying this platform is now a simple, one-step process with our new production-ready scripts.
 
-### Step 1: Configure Your Deployment
-
-1.  **Clone the Repository:**
-    ```bash
-    git clone https://github.com/cbwinslow/supa-container.git
-    cd supa-container
-    ```
-
-2.  **Edit the Main Configuration File:**
-    Open `config.sh` and set your domain, email, and a secure password for the Traefik dashboard.
-
-### Step 2: Generate Secrets
-
-Run the new `populate_secrets.sh` script. This will read your config and create a `.env` file with all the necessary secure, random passwords for your services.
+### Option 1: One-Click Deployment (Recommended)
 
 ```bash
-bash populate_secrets.sh
+# Clone the repository
+git clone https://github.com/cbwinslow/supa-container.git
+cd supa-container
+
+# Run the one-click deployment script
+sudo bash one_click_deploy.sh yourdomain.com admin@yourdomain.com
 ```
-*(This step does not require `sudo`)*
 
-### Step 3: Deploy the Application
+This single command will:
+- Generate all necessary secrets and passwords
+- Install and configure all services  
+- Set up security hardening
+- Deploy AI orchestrator and agents
+- Configure monitoring and observability
+- Run comprehensive tests
 
-Run the main deployment script with `sudo`. This will create the server directories, copy the application code, and generate the final `docker-compose.yml`.
+### Option 2: Step-by-Step Deployment
 
+For more control over the deployment process:
+
+#### Step 1: Generate Secrets
 ```bash
-sudo bash deploy.sh
+bash generate_production_secrets.sh yourdomain.com
 ```
 
-### Step 4: Final Setup & Key Retrieval
+#### Step 2: Deploy Infrastructure  
+```bash
+sudo bash deploy_hetzner.sh
+```
 
-This is a one-time setup to initialize the database and get your unique Supabase API keys.
+#### Step 3: Start Services
+```bash
+cd /opt/supa-container
+sudo ./start_platform.sh
+```
 
-1.  **Start the Services:**
-    ```bash
-    cd /opt/supabase-super-stack
-    sudo docker-compose up -d
-    ```
-    Wait a minute for all services to start.
+#### Step 4: Complete Setup
+```bash
+sudo bash post_deployment_setup.sh
+```
 
-2.  **Run the Post-Deployment Script:**
-    This script will apply the database schemas and fetch your API keys.
-    ```bash
-    # From the /opt/supabase-super-stack directory
-    sudo ../post-deploy-setup.sh
-    ```
+#### Step 5: Validate Deployment
+```bash
+sudo bash test_deployment.sh
+```
 
-3.  **Update Your `.env` File:**
-    The script will print your unique `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. **Manually copy these lines and paste them into your `.env` file:**
-    ```bash
-    sudo nano /opt/supabase-super-stack/.env
-    ```
+### Post-Deployment
 
-4.  **Restart the Application:**
-    For the new keys to take effect, restart the relevant services.
-    ```bash
-    sudo docker-compose restart nextjs_app fastapi_app
-    ```
+After deployment, configure DNS records to point to your server:
 
-Your application is now fully deployed and operational!
+```
+yourdomain.com          -> YOUR_SERVER_IP
+api.yourdomain.com      -> YOUR_SERVER_IP  
+grafana.yourdomain.com  -> YOUR_SERVER_IP
+traefik.yourdomain.com  -> YOUR_SERVER_IP
+# ... and other subdomains
+```
+
+Your application will be fully operational once DNS propagates!
 
 ---
 
 ## Usage Guide
 
+After deployment and DNS configuration, access your platform at:
+
 -   **Main Application:** `https://your-domain.com`
 -   **API Documentation:** `https://api.your-domain.com/docs`
--   **AI Prototyping Lab (Flowise):** `https://flowise.your-domain.com`
--   **Workflow Automation (n8n):** `https://n8n.your-domain.com`
--   **LLM Observability (Langfuse):** `https://langfuse.your-domain.com`
--   **Observability (Jaeger):** `https://jaeger.your-domain.com`
+-   **System Monitoring:** `https://grafana.your-domain.com`
+-   **AI Workflow Lab:** `https://flowise.your-domain.com`
+-   **Automation Hub:** `https://n8n.your-domain.com`
+-   **LLM Observability:** `https://langfuse.your-domain.com`
+-   **Distributed Tracing:** `https://jaeger.your-domain.com`
 -   **Traefik Dashboard:** `https://traefik.your-domain.com`
+-   **Message Broker:** `https://rabbitmq.your-domain.com`
+-   **Knowledge Graph:** `https://neo4j.your-domain.com`
+
+### Management Commands
+
+```bash
+# Monitor platform status
+sudo /opt/supa-container/monitor_platform.sh
+
+# Create system backup  
+sudo /opt/supa-container/backup_platform.sh
+
+# View real-time logs
+cd /opt/supa-container && sudo docker-compose logs -f
+
+# Test all components
+sudo bash test_deployment.sh
+
+# Restart platform
+sudo systemctl restart supa-container
+```
+
+### AI Features
+
+The platform includes an advanced AI orchestrator managing:
+- **Self-healing system recovery** - Automatic detection and resolution of issues
+- **Intelligent monitoring** - Performance optimization and anomaly detection  
+- **Data flow optimization** - Smart data routing and processing
+- **Agent coordination** - Autonomous task distribution and execution
+
+Access the AI management interface through the monitoring dashboard to view agent activity and system intelligence.
 
 
