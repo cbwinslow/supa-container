@@ -3,11 +3,13 @@ Flexible provider configuration for LLM and embedding models.
 """
 
 import os
+import logging
 from typing import Optional
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.models.openai import OpenAIModel
 import openai
 from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -87,9 +89,12 @@ def get_embedding_provider() -> str:
 def validate_configuration() -> bool:
     """
     Validate that required environment variables are set.
-    
+
     Returns:
         True if configuration is valid
+
+    Raises:
+        RuntimeError: If required configuration is missing.
     """
     required_vars = [
         'LLM_API_KEY',
@@ -97,18 +102,18 @@ def validate_configuration() -> bool:
         'EMBEDDING_API_KEY',
         'EMBEDDING_MODEL'
     ]
-    
+
     missing_vars = []
     for var in required_vars:
         if not os.getenv(var):
             missing_vars.append(var)
-    
-    if missing_vars:
-        print(f"Missing required environment variables: {', '.join(missing_vars)}")
-        return False
-    
-    return True
 
+    if missing_vars:
+        msg = f"Missing required environment variables: {', '.join(missing_vars)}"
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+    return True
 
 def get_model_info() -> dict:
     """

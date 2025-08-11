@@ -42,4 +42,5 @@ def test_validate_configuration_success():
 def test_validate_configuration_failure():
     """Tests that validation fails when env vars are missing."""
     with patch.dict(os.environ, {}, clear=True):
-        assert validate_configuration() is False
+        with pytest.raises(RuntimeError):
+            validate_configuration()
