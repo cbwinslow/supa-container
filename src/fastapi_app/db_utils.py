@@ -9,16 +9,16 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from uuid import UUID
-import logging
 
 import asyncpg
 from asyncpg.pool import Pool
 from dotenv import load_dotenv
+from logging_config import get_logger
 
 # Load environment variables
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def verify_auth_token(token: str) -> bool:

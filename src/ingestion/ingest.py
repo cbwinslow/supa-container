@@ -4,7 +4,6 @@ Main ingestion script for processing markdown documents into vector DB and knowl
 
 import os
 import asyncio
-import logging
 import json
 import glob
 from pathlib import Path
@@ -23,11 +22,12 @@ from .graph_builder import create_graph_builder
 from fastapi_app.db_utils import initialize_database, close_database, db_pool
 from fastapi_app.graph_utils import initialize_graph, close_graph
 from fastapi_app.models import IngestionConfig, IngestionResult
+from logging_config import get_logger
 
 # Load environment variables
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DocumentIngestionPipeline:
