@@ -10,17 +10,16 @@ from uuid import UUID
 import asyncpg
 from asyncpg.pool import Pool
 
+from logging_config import get_logger
+from settings import settings
 
 logger = get_logger(__name__)
+API_AUTH_TOKEN = settings.api_auth_token
 
 
 async def verify_auth_token(token: str) -> bool:
-    """Verify bearer token using environment variable."""
-    expected = os.getenv("API_AUTH_TOKEN")
-    if not expected:
-        logger.warning("API_AUTH_TOKEN not set")
-        return False
-    return token == expected
+    """Verify bearer token against configured token."""
+    return token == API_AUTH_TOKEN
 
 
 class DatabasePool:
@@ -78,9 +77,6 @@ async def initialize_database():
 
 
 # Authentication utilities
-API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN")
-if not API_AUTH_TOKEN:
-    raise ValueError("API_AUTH_TOKEN environment variable must be set for authentication")
 
 
 async def verify_token(token: str) -> bool:

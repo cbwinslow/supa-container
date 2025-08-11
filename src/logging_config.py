@@ -1,11 +1,6 @@
 import logging
-import os
 from logging.config import dictConfig
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()
-LOG_OUTPUT = os.getenv("LOG_OUTPUT", "console").lower()
-LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "app.log")
 
 def setup_logging() -> None:
     """
