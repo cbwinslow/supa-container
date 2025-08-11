@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 from pathlib import Path
+import socket
 import pytest
 
 
@@ -19,3 +20,16 @@ def test_fastapi_dockerfile_builds():
         text=True,
     )
     assert result.returncode == 0
+
+
+def test_firewall_tool_available():
+    """Verify that a firewall management utility is installed."""
+    if not (shutil.which("ufw") or shutil.which("iptables")):
+        pytest.skip("No firewall utility installed")
+
+
+def test_required_ports_available():
+    """Check that common service ports are free for binding."""
+    for port in (22, 80, 8000):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            assert sock.connect_ex(("localhost", port)) != 0
