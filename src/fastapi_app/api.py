@@ -187,7 +187,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         exc: The RateLimitExceeded exception instance (not inspected by this handler).
     
     Returns:
-        fastapi.responses.JSONResponse with status code 429 and the JSON body described above.
+        JSONResponse with status code 429 and the JSON body described above.
     """
     logger.warning(f"Rate limit exceeded: {rate_limit_key(request)}")
     return JSONResponse(
