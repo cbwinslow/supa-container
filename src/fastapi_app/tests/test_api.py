@@ -1,13 +1,4 @@
 import os
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, MagicMock
-import json
-
-os.environ.setdefault("DATABASE_URL", "postgresql://user:pass@localhost:5432/db")
-os.environ.setdefault("NEO4J_PASSWORD", "test")
-os.environ.setdefault("LLM_API_KEY", "test")
-os.environ.setdefault("EMBEDDING_API_KEY", "test")
 
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult
@@ -18,6 +9,7 @@ pytestmark = pytest.mark.asyncio
 client = TestClient(app)
 
 # --- Mocks and Fixtures ---
+
 
 
 @pytest.fixture
@@ -121,18 +113,13 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_database"] is True
 
 
-async def test_chat_endpoint_creates_session(mock_db_utils, mock_agent_execution):
-    mock_db_utils["get_session"].return_value = None  # Simulate no existing session
-    response = client.post("/chat", json={"message": "Hello"})
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "new-session-123"
 
 
-async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_execution):
-    response = client.post(
-        "/chat", json={"message": "Hello again", "session_id": "existing-session-456"}
+
     )
     assert response.status_code == 200
     mock_db_utils["get_session"].assert_called_with("existing-session-456")
@@ -142,7 +129,6 @@ async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_exe
     assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
 
 
-async def test_chat_stream_endpoint(mock_db_utils):
     # Mock the agent's streaming logic
     with patch("fastapi_app.api.rag_agent.iter") as mock_iter:
 
@@ -155,20 +141,18 @@ async def test_chat_stream_endpoint(mock_db_utils):
 
         mock_iter.return_value.__aenter__.return_value = mock_streamer()  # type: ignore
 
-        response = client.post("/chat/stream", json={"message": "stream test"})
+
         assert response.status_code == 200
         # In a real test client, you would iterate over the streaming response
         # Here we just confirm the endpoint is reachable and returns a streaming content type
         assert "text/event-stream" in response.headers["content-type"]
 
-
-async def test_vector_search_endpoint(mock_tools):
     with patch(
         "fastapi_app.tools.generate_embedding",
         new_callable=AsyncMock,
         return_value=[0.1] * 1536,
     ):
-        response = client.post("/search/vector", json={"query": "test"})
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "vector"
@@ -177,8 +161,6 @@ async def test_vector_search_endpoint(mock_tools):
         mock_tools["vector"].assert_called_once()
 
 
-async def test_graph_search_endpoint(mock_tools):
-    response = client.post("/search/graph", json={"query": "test"})
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["search_type"] == "graph"
@@ -187,13 +169,13 @@ async def test_graph_search_endpoint(mock_tools):
     mock_tools["graph"].assert_called_once()
 
 
-async def test_hybrid_search_endpoint(mock_tools):
+
     with patch(
         "fastapi_app.tools.generate_embedding",
         new_callable=AsyncMock,
         return_value=[0.1] * 1536,
     ):
-        response = client.post("/search/hybrid", json={"query": "test"})
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "hybrid"

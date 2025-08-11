@@ -12,7 +12,7 @@ from datetime import datetime
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import StreamingResponse, JSONResponse
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
@@ -27,6 +27,7 @@ from fastapi_app.db_utils import (
     add_message,
     get_session_messages,
     test_connection,
+    verify_auth_token,
 )
 from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
 from fastapi_app.models import (
@@ -114,6 +115,19 @@ logging.basicConfig(
 # Set debug level for our module during development
 if APP_ENV == "development":
     logger.setLevel(logging.DEBUG)
+
+
+security = HTTPBearer()
+
+
+async def auth_dependency(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Simple bearer token authentication dependency."""
+    token = credentials.credentials
+    if not await verify_auth_token(token):
+        raise HTTPException(status_code=401, detail="Invalid or missing authentication")
+    return token
 
 
 @asynccontextmanager
@@ -458,8 +472,7 @@ async def health_check():
 
 
 @app.post("/chat", response_model=ChatResponse)
-@limiter.limit("5/minute")
-async def chat(request: Request, chat_request: ChatRequest):
+
     """Non-streaming chat endpoint."""
     try:
         # Get or create session
@@ -485,8 +498,7 @@ async def chat(request: Request, chat_request: ChatRequest):
 
 
 @app.post("/chat/stream")
-@limiter.limit("5/minute")
-async def chat_stream(request: Request, chat_request: ChatRequest):
+
     """Streaming chat endpoint using Server-Sent Events."""
     try:
         # Get or create session
@@ -494,6 +506,7 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
 
         async def generate_stream() -> AsyncGenerator[str, None]:
             """Generate streaming response using agent.iter() pattern."""
+            run = None
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
@@ -524,11 +537,12 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                 full_response = ""
 
                 # Stream using agent.iter() pattern
-                async with rag_agent.iter(full_prompt, deps=deps) as run:
-                    async for node in run:
+                async with rag_agent.iter(full_prompt, deps=deps) as r:
+                    run = r
+                    async for node in r:
                         if rag_agent.is_model_request_node(node):
                             # Stream tokens from the model
-                            async with node.stream(run.ctx) as request_stream:
+                            async with node.stream(r.ctx) as request_stream:
                                 async for event in request_stream:
                                     from pydantic_ai.messages import (
                                         PartStartEvent,
@@ -544,9 +558,10 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                                    elif isinstance(
-                                        event, PartDeltaEvent
-                                    ) and isinstance(event.delta, TextPartDelta):
+                                    elif (
+                                        isinstance(event, PartDeltaEvent)
+                                        and isinstance(event.delta, TextPartDelta)
+                                    ):
                                         delta_content = event.delta.content_delta
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
@@ -575,12 +590,44 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                     metadata={"streamed": True, "tool_calls": len(tools_used)},
                 )
 
-                yield f"data: {json.dumps({'type': 'end'})}\n\n"
-
             except Exception as e:
                 logger.error(f"Stream error: {e}")
-                error_chunk = {"type": "error", "content": f"Stream error: {str(e)}"}
+                error_chunk = {"type": "error", "content": str(e)}
                 yield f"data: {json.dumps(error_chunk)}\n\n"
+            finally:
+                if run is not None:
+                    close_func = getattr(run, "aclose", None) or getattr(run, "close", None)
+                    if close_func:
+                        try:
+                            if asyncio.iscoroutinefunction(close_func):
+                                await close_func()
+                            else:
+                                close_func()
+                        except Exception as close_err:
+                    try:
+                        # Prefer aclose only if run is an async generator or async context manager
+                        if inspect.isasyncgen(run):
+                            await run.aclose()
+                        elif hasattr(run, "__aexit__"):
+                            # If it's an async context manager, call aclose if present
+                            aclose_func = getattr(run, "aclose", None)
+                            if aclose_func and asyncio.iscoroutinefunction(aclose_func):
+                                await aclose_func()
+                            elif hasattr(run, "close"):
+                                close_func = getattr(run, "close")
+                                if asyncio.iscoroutinefunction(close_func):
+                                    await close_func()
+                                else:
+                                    close_func()
+                        elif hasattr(run, "close"):
+                            close_func = getattr(run, "close")
+                            if asyncio.iscoroutinefunction(close_func):
+                                await close_func()
+                            else:
+                                close_func()
+                    except Exception as close_err:
+                        logger.error(f"Error closing run: {close_err}")
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
         return StreamingResponse(
             generate_stream(),
@@ -598,7 +645,7 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
 
 
 @app.post("/search/vector")
-async def search_vector(request: SearchRequest):
+async def search_vector(request: SearchRequest, auth: str = Depends(auth_dependency)):
     """Vector search endpoint."""
     try:
         input_data = VectorSearchInput(query=request.query, limit=request.limit)
@@ -622,7 +669,7 @@ async def search_vector(request: SearchRequest):
 
 
 @app.post("/search/graph")
-async def search_graph(request: SearchRequest):
+async def search_graph(request: SearchRequest, auth: str = Depends(auth_dependency)):
     """Knowledge graph search endpoint."""
     try:
         input_data = GraphSearchInput(query=request.query)
@@ -646,7 +693,7 @@ async def search_graph(request: SearchRequest):
 
 
 @app.post("/search/hybrid")
-async def search_hybrid(request: SearchRequest):
+async def search_hybrid(request: SearchRequest, auth: str = Depends(auth_dependency)):
     """Hybrid search endpoint."""
     try:
         input_data = HybridSearchInput(query=request.query, limit=request.limit)
