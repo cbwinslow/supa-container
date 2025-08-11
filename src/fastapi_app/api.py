@@ -18,6 +18,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
 from dotenv import load_dotenv
 
+from logging_config import get_logger
+
 from fastapi_app.agent import rag_agent, AgentDependencies
 from fastapi_app.db_utils import (
     initialize_database,
@@ -83,20 +85,13 @@ langfuse = Langfuse()
 # Load environment variables
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Application configuration
 APP_ENV = os.getenv("APP_ENV", "development")
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("APP_PORT", 8000))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 
 # Set debug level for our module during development
 if APP_ENV == "development":
