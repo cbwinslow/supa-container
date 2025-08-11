@@ -12,7 +12,15 @@ def setup_logging() -> None:
 
     formatters = {
         "standard": {
-            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+_LOGGING_CONFIGURED = False
+
+def setup_logging() -> None:
+    """
+    Configure logging for the application.
+    This function is idempotent and will not add duplicate handlers if called multiple times.
+    """
+    global _LOGGING_CONFIGURED
+    if _LOGGING_CONFIGURED:
         },
     }
 
