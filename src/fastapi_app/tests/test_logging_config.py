@@ -67,18 +67,40 @@ def test_console_and_file_handlers_are_added():
         os.remove("test.log")
 
 @patch.dict(os.environ, {"LOG_FORMAT": "json"}, clear=True)
-def test_json_formatter_is_used():
-    """Verify that the JsonFormatter is used when LOG_FORMAT is 'json'."""
-    # This test requires python-json-logger to be installed
-    try:
-        from pythonjsonlogger.jsonlogger import JsonFormatter
-    except ImportError:
-        # If the library isn't installed, we can't run this test,
-        # but the code should handle it gracefully.
-        # The dependency installation should handle this in the real environment.
-        return
+def test_json_formatter_is_used(monkeypatch, caplog):
+    """Verify that the JsonFormatter is used when LOG_FORMAT is 'json', and fallback behavior if unavailable."""
 
     clear_root_handlers()
+
+    # Simulate ImportError for python-json-logger
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "pythonjsonlogger.jsonlogger":
+            raise ImportError("Simulated missing python-json-logger")
+        return real_import(name, *args, **kwargs)
+
+    # Test fallback behavior when python-json-logger is missing
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with caplog.at_level("WARNING"):
+        importlib.reload(logging_config)
+        handler = logging.root.handlers[0]
+        # Should use standard formatter
+        assert not hasattr(handler.formatter, "jsonify"), "Fallback to standard formatter expected"
+        # Should log a warning about missing dependency
+        assert any("python-json-logger" in r.message for r in caplog.records), "Warning about missing python-json-logger expected"
+
+    # Restore import for normal test
+    monkeypatch.setattr(builtins, "__import__", real_import)
+    try:
+        from pythonjsonlogger.jsonlogger import JsonFormatter
+        importlib.reload(logging_config)
+        handler = logging.root.handlers[0]
+        assert isinstance(handler.formatter, JsonFormatter), "JsonFormatter should be used when available"
+    except ImportError:
+        # If not installed, fallback already tested above
+        pass
 
     # Mock the JsonFormatter to check if it's instantiated
     with patch('pythonjsonlogger.jsonlogger.JsonFormatter', MagicMock()) as mock_json_formatter:
