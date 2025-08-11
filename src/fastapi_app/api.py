@@ -1,8 +1,5 @@
-"""
-FastAPI endpoints for the agentic RAG system.
-"""
+"""FastAPI endpoints for the agentic RAG system."""
 
-import os
 import asyncio
 import json
 import logging
@@ -11,12 +8,12 @@ from typing import Dict, Any, List, Optional, AsyncGenerator
 from datetime import datetime
 import uuid
 
-from fastapi import FastAPI, HTTPException, Request, Depends
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
-from dotenv import load_dotenv
+
+
 
 from fastapi_app.agent import rag_agent, AgentDependencies
 from fastapi_app.db_utils import (
@@ -27,7 +24,7 @@ from fastapi_app.db_utils import (
     add_message,
     get_session_messages,
     test_connection,
-    verify_auth_token,
+
 )
 from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
 from fastapi_app.models import (
@@ -35,10 +32,13 @@ from fastapi_app.models import (
     ChatResponse,
     SearchRequest,
     SearchResponse,
+    DocumentListRequest,
+    DocumentListResponse,
     StreamDelta,
     ErrorResponse,
     HealthStatus,
     ToolCall,
+    Session,
 )
 from fastapi_app.tools import (
     vector_search_tool,
@@ -86,38 +86,10 @@ langfuse = Langfuse()
 
 # --- End OpenTelemetry ---
 
-# Load environment variables
-load_dotenv()
-
-logger = logging.getLogger(__name__)
 
 
-def rate_limit_key(request: Request) -> str:
-    """Determine rate limit key based on user ID or IP address."""
-    return request.headers.get("X-User-ID") or get_remote_address(request)
 
 
-limiter = Limiter(key_func=rate_limit_key, default_limits=["100/minute"])
-
-
-# Application configuration
-APP_ENV = os.getenv("APP_ENV", "development")
-APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
-APP_PORT = int(os.getenv("APP_PORT", 8000))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-
-# Set debug level for our module during development
-if APP_ENV == "development":
-    logger.setLevel(logging.DEBUG)
-
-
-security = HTTPBearer()
 
 
 async def auth_dependency(
@@ -191,7 +163,7 @@ FastAPIInstrumentor.instrument_app(app)
 # Add middleware with flexible CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -202,7 +174,21 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    """Custom response when rate limit is exceeded."""
+    """
+    Return a 429 JSONResponse when a rate limit is exceeded.
+    
+    Logs a warning (including the rate-limit key) and returns a JSON body with keys:
+    - error: short message,
+    - error_type: "RateLimitExceeded",
+    - request_id: a new UUID for tracing.
+    
+    Parameters:
+        request: FastAPI Request object for the current request (used to compute the rate-limit key).
+        exc: The RateLimitExceeded exception instance (not inspected by this handler).
+    
+    Returns:
+        JSONResponse with status code 429 and the JSON body described above.
+    """
     logger.warning(f"Rate limit exceeded: {rate_limit_key(request)}")
     return JSONResponse(
         status_code=429,
@@ -216,7 +202,19 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 # Helper functions for agent execution
 async def get_or_create_session(request: ChatRequest) -> str:
-    """Get existing session or create new one."""
+    """
+    Retrieve an existing session ID from the provided ChatRequest or create a new session.
+    
+    If request.session_id is present and corresponds to an existing session, that ID is returned.
+    Otherwise a new session is created using request.user_id and request.metadata and the new session_id is returned.
+    
+    Parameters:
+        request (ChatRequest): Incoming chat request; uses `session_id` to look up an existing session,
+            and `user_id`/`metadata` when creating a new session.
+    
+    Returns:
+        str: The existing or newly created session ID.
+    """
     if request.session_id:
         session = await get_session(request.session_id)
         if session:
@@ -242,6 +240,17 @@ async def get_conversation_context(
     messages = await get_session_messages(session_id, limit=max_messages)
 
     return [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+
+
+# Authentication dependency
+async def auth_dependency(authorization: Optional[str] = Header(None)) -> str:
+    """Simple bearer token authentication."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token")
+    token = authorization[7:]  # Extract everything after 'Bearer ' (case-insensitive)
+    if not await verify_token(token.strip()):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return token.strip()
 
 
 def extract_tool_calls(result: Any) -> List[ToolCall]:
@@ -473,7 +482,6 @@ async def health_check():
 
 @app.post("/chat", response_model=ChatResponse)
 
-    """Non-streaming chat endpoint."""
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
@@ -499,14 +507,12 @@ async def health_check():
 
 @app.post("/chat/stream")
 
-    """Streaming chat endpoint using Server-Sent Events."""
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
 
         async def generate_stream() -> AsyncGenerator[str, None]:
-            """Generate streaming response using agent.iter() pattern."""
-            run = None
+
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
@@ -524,7 +530,7 @@ async def health_check():
                     context_str = "\n".join(
                         [f"{msg['role']}: {msg['content']}" for msg in context[-6:]]
                     )
-                    full_prompt = f"Previous conversation:\n{context_str}\n\nCurrent question: {chat_request.message}"
+
 
                 # Save user message immediately
                 await add_message(
@@ -537,12 +543,7 @@ async def health_check():
                 full_response = ""
 
                 # Stream using agent.iter() pattern
-                async with rag_agent.iter(full_prompt, deps=deps) as r:
-                    run = r
-                    async for node in r:
-                        if rag_agent.is_model_request_node(node):
-                            # Stream tokens from the model
-                            async with node.stream(r.ctx) as request_stream:
+
                                 async for event in request_stream:
                                     from pydantic_ai.messages import (
                                         PartStartEvent,
@@ -566,9 +567,12 @@ async def health_check():
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                # Extract tools used from the final result
-                result = run.result
-                tools_used = extract_tool_calls(result)
+                if run is not None:
+                    # Extract tools used from the final result
+                    result = run.result
+                    tools_used = extract_tool_calls(result)
+                else:
+                    tools_used = []
 
                 # Send tools used information
                 if tools_used:
@@ -592,39 +596,7 @@ async def health_check():
 
             except Exception as e:
                 logger.error(f"Stream error: {e}")
-                error_chunk = {"type": "error", "content": str(e)}
-                yield f"data: {json.dumps(error_chunk)}\n\n"
-            finally:
-                if run is not None:
-                    close_func = getattr(run, "aclose", None) or getattr(run, "close", None)
-                    if close_func:
-                        try:
-                            if asyncio.iscoroutinefunction(close_func):
-                                await close_func()
-                            else:
-                                close_func()
-                        except Exception as close_err:
-                    try:
-                        # Prefer aclose only if run is an async generator or async context manager
-                        if inspect.isasyncgen(run):
-                            await run.aclose()
-                        elif hasattr(run, "__aexit__"):
-                            # If it's an async context manager, call aclose if present
-                            aclose_func = getattr(run, "aclose", None)
-                            if aclose_func and asyncio.iscoroutinefunction(aclose_func):
-                                await aclose_func()
-                            elif hasattr(run, "close"):
-                                close_func = getattr(run, "close")
-                                if asyncio.iscoroutinefunction(close_func):
-                                    await close_func()
-                                else:
-                                    close_func()
-                        elif hasattr(run, "close"):
-                            close_func = getattr(run, "close")
-                            if asyncio.iscoroutinefunction(close_func):
-                                await close_func()
-                            else:
-                                close_func()
+
                     except Exception as close_err:
                         logger.error(f"Error closing run: {close_err}")
                 yield f"data: {json.dumps({'type': 'end'})}\n\n"
@@ -644,8 +616,7 @@ async def health_check():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/search/vector")
-async def search_vector(request: SearchRequest, auth: str = Depends(auth_dependency)):
+
     """Vector search endpoint."""
     try:
         input_data = VectorSearchInput(query=request.query, limit=request.limit)
@@ -667,9 +638,6 @@ async def search_vector(request: SearchRequest, auth: str = Depends(auth_depende
         logger.error(f"Vector search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.post("/search/graph")
-async def search_graph(request: SearchRequest, auth: str = Depends(auth_dependency)):
     """Knowledge graph search endpoint."""
     try:
         input_data = GraphSearchInput(query=request.query)
@@ -692,8 +660,7 @@ async def search_graph(request: SearchRequest, auth: str = Depends(auth_dependen
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/search/hybrid")
-async def search_hybrid(request: SearchRequest, auth: str = Depends(auth_dependency)):
+
     """Hybrid search endpoint."""
     try:
         input_data = HybridSearchInput(query=request.query, limit=request.limit)
@@ -716,26 +683,26 @@ async def search_hybrid(request: SearchRequest, auth: str = Depends(auth_depende
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/documents")
-async def list_documents_endpoint(limit: int = 20, offset: int = 0):
+@app.get("/documents", response_model=DocumentListResponse)
+async def list_documents_endpoint(params: DocumentListRequest = Depends()):
     """List documents endpoint."""
     try:
-        input_data = DocumentListInput(limit=limit, offset=offset)
+        input_data = DocumentListInput(limit=params.limit, offset=params.offset)
         documents = await list_documents_tool(input_data)
 
-        return {
-            "documents": documents,
-            "total": len(documents),
-            "limit": limit,
-            "offset": offset,
-        }
+        return DocumentListResponse(
+            documents=documents,
+            total=len(documents),
+            limit=params.limit,
+            offset=params.offset,
+        )
 
     except Exception as e:
         logger.error(f"Document listing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/sessions/{session_id}")
+@app.get("/sessions/{session_id}", response_model=Session)
 async def get_session_info(session_id: str):
     """Get session information."""
     try:
@@ -743,7 +710,7 @@ async def get_session_info(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        return session
+        return Session(**session)
 
     except HTTPException:
         raise
@@ -757,10 +724,19 @@ async def get_session_info(session_id: str):
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
+    request_id = str(uuid.uuid4())
+    details = getattr(exc, "detail", None)
+    if details is not None and not isinstance(details, dict):
+        details = {"detail": details}
 
-    return ErrorResponse(
-        error=str(exc), error_type=type(exc).__name__, request_id=str(uuid.uuid4())
+    error_response = ErrorResponse(
+        error=str(exc),
+        error_type=type(exc).__name__,
+        details=details,
+        request_id=request_id,
     )
+
+    return JSONResponse(status_code=500, content=error_response.model_dump())
 
 
 # Development server

@@ -107,18 +107,4 @@ Your application is now fully deployed and operational!
 -   **Observability (Jaeger):** `https://jaeger.your-domain.com`
 -   **Traefik Dashboard:** `https://traefik.your-domain.com`
 
-### API Rate Limiting
 
-The FastAPI backend uses the `slowapi` library to enforce rate limits.
-
-- **Default limit:** 100 requests per minute per user or IP.
-- **Chat endpoints:** restricted to 5 requests per minute.
-- The limiter uses the `X-User-ID` header when present, otherwise the client's IP address.
-
-Exceeding a limit returns an HTTP 429 response with a JSON body:
-
-```json
-{"error": "Rate limit exceeded", "error_type": "RateLimitExceeded"}
-```
-
-Limits can be adjusted in `src/fastapi_app/api.py`.
