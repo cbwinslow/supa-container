@@ -4,7 +4,6 @@ Document embedding generation for vector search.
 
 import os
 import asyncio
-import logging
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import json
@@ -16,11 +15,12 @@ from .chunker import DocumentChunk
 
 # Import flexible providers
 from fastapi_app.providers import get_embedding_client, get_embedding_model
+from logging_config import get_logger
 
 # Load environment variables
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Initialize client with flexible provider
 embedding_client = get_embedding_client()
