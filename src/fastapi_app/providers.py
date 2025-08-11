@@ -1,16 +1,11 @@
-"""
-Flexible provider configuration for LLM and embedding models.
-"""
+"""Flexible provider configuration for LLM and embedding models."""
 
-import os
 from typing import Optional
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.models.openai import OpenAIModel
 import openai
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+from settings import settings
 
 
 def get_llm_model(model_choice: Optional[str] = None) -> OpenAIModel:
@@ -23,9 +18,9 @@ def get_llm_model(model_choice: Optional[str] = None) -> OpenAIModel:
     Returns:
         Configured OpenAI-compatible model
     """
-    llm_choice = model_choice or os.getenv('LLM_CHOICE', 'gpt-4-turbo-preview')
-    base_url = os.getenv('LLM_BASE_URL', 'https://api.openai.com/v1')
-    api_key = os.getenv('LLM_API_KEY', 'ollama')
+    llm_choice = model_choice or settings.llm_choice
+    base_url = settings.llm_base_url
+    api_key = settings.llm_api_key
     
     provider = OpenAIProvider(base_url=base_url, api_key=api_key)
     return OpenAIModel(llm_choice, provider=provider)
@@ -38,8 +33,8 @@ def get_embedding_client() -> openai.AsyncOpenAI:
     Returns:
         Configured OpenAI-compatible client for embeddings
     """
-    base_url = os.getenv('EMBEDDING_BASE_URL', 'https://api.openai.com/v1')
-    api_key = os.getenv('EMBEDDING_API_KEY', 'ollama')
+    base_url = settings.embedding_base_url
+    api_key = settings.embedding_api_key or settings.llm_api_key
     
     return openai.AsyncOpenAI(
         base_url=base_url,
@@ -54,7 +49,7 @@ def get_embedding_model() -> str:
     Returns:
         Embedding model name
     """
-    return os.getenv('EMBEDDING_MODEL', 'text-embedding-3-small')
+    return settings.embedding_model
 
 
 def get_ingestion_model() -> OpenAIModel:
@@ -64,7 +59,7 @@ def get_ingestion_model() -> OpenAIModel:
     Returns:
         Configured model for ingestion tasks
     """
-    ingestion_choice = os.getenv('INGESTION_LLM_CHOICE')
+    ingestion_choice = settings.ingestion_llm_choice
     
     # If no specific ingestion model, use the main model
     if not ingestion_choice:
@@ -76,12 +71,12 @@ def get_ingestion_model() -> OpenAIModel:
 # Provider information functions
 def get_llm_provider() -> str:
     """Get the LLM provider name."""
-    return os.getenv('LLM_PROVIDER', 'openai')
+    return settings.llm_provider
 
 
 def get_embedding_provider() -> str:
     """Get the embedding provider name."""
-    return os.getenv('EMBEDDING_PROVIDER', 'openai')
+    return settings.embedding_provider
 
 
 def validate_configuration() -> bool:
@@ -91,17 +86,14 @@ def validate_configuration() -> bool:
     Returns:
         True if configuration is valid
     """
-    required_vars = [
-        'LLM_API_KEY',
-        'LLM_CHOICE',
-        'EMBEDDING_API_KEY',
-        'EMBEDDING_MODEL'
-    ]
-    
-    missing_vars = []
-    for var in required_vars:
-        if not os.getenv(var):
-            missing_vars.append(var)
+    required_vars = {
+        'LLM_API_KEY': settings.llm_api_key,
+        'LLM_CHOICE': settings.llm_choice,
+        'EMBEDDING_API_KEY': settings.embedding_api_key or settings.llm_api_key,
+        'EMBEDDING_MODEL': settings.embedding_model,
+    }
+
+    missing_vars = [name for name, value in required_vars.items() if not value]
     
     if missing_vars:
         print(f"Missing required environment variables: {', '.join(missing_vars)}")
@@ -119,10 +111,10 @@ def get_model_info() -> dict:
     """
     return {
         "llm_provider": get_llm_provider(),
-        "llm_model": os.getenv('LLM_CHOICE'),
-        "llm_base_url": os.getenv('LLM_BASE_URL'),
+        "llm_model": settings.llm_choice,
+        "llm_base_url": settings.llm_base_url,
         "embedding_provider": get_embedding_provider(),
         "embedding_model": get_embedding_model(),
-        "embedding_base_url": os.getenv('EMBEDDING_BASE_URL'),
-        "ingestion_model": os.getenv('INGESTION_LLM_CHOICE', 'same as main'),
+        "embedding_base_url": settings.embedding_base_url,
+        "ingestion_model": settings.ingestion_llm_choice or 'same as main',
     }

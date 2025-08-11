@@ -13,7 +13,6 @@ from datetime import datetime
 import argparse
 
 import asyncpg
-from dotenv import load_dotenv
 
 from .chunker import ChunkingConfig, create_chunker, DocumentChunk
 from .embedder import create_embedder
@@ -23,9 +22,6 @@ from .graph_builder import create_graph_builder
 from fastapi_app.db_utils import initialize_database, close_database, db_pool
 from fastapi_app.graph_utils import initialize_graph, close_graph
 from fastapi_app.models import IngestionConfig, IngestionResult
-
-# Load environment variables
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 
