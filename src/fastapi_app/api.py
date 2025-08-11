@@ -92,7 +92,12 @@ logger = logging.getLogger(__name__)
 
 
 def rate_limit_key(request: Request) -> str:
-    """Determine rate limit key based on user ID or IP address."""
+    """
+    Return the rate-limit key for the incoming request.
+    
+    Prefer the "X-User-ID" header value when present; otherwise fall back to the client's IP
+    (as returned by get_remote_address). The returned string is used as the per-request limiter key.
+    """
     return request.headers.get("X-User-ID") or get_remote_address(request)
 
 
@@ -188,7 +193,21 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    """Custom response when rate limit is exceeded."""
+    """
+    Return a 429 JSONResponse when a rate limit is exceeded.
+    
+    Logs a warning (including the rate-limit key) and returns a JSON body with keys:
+    - error: short message,
+    - error_type: "RateLimitExceeded",
+    - request_id: a new UUID for tracing.
+    
+    Parameters:
+        request: FastAPI Request object for the current request (used to compute the rate-limit key).
+        exc: The RateLimitExceeded exception instance (not inspected by this handler).
+    
+    Returns:
+        fastapi.responses.JSONResponse with status code 429 and the JSON body described above.
+    """
     logger.warning(f"Rate limit exceeded: {rate_limit_key(request)}")
     return JSONResponse(
         status_code=429,
@@ -202,7 +221,19 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 # Helper functions for agent execution
 async def get_or_create_session(request: ChatRequest) -> str:
-    """Get existing session or create new one."""
+    """
+    Retrieve an existing session ID from the provided ChatRequest or create a new session.
+    
+    If request.session_id is present and corresponds to an existing session, that ID is returned.
+    Otherwise a new session is created using request.user_id and request.metadata and the new session_id is returned.
+    
+    Parameters:
+        request (ChatRequest): Incoming chat request; uses `session_id` to look up an existing session,
+            and `user_id`/`metadata` when creating a new session.
+    
+    Returns:
+        str: The existing or newly created session ID.
+    """
     if request.session_id:
         session = await get_session(request.session_id)
         if session:
@@ -460,7 +491,20 @@ async def health_check():
 @app.post("/chat", response_model=ChatResponse)
 @limiter.limit("5/minute")
 async def chat(request: Request, chat_request: ChatRequest):
-    """Non-streaming chat endpoint."""
+    """
+    Handle a single non-streaming chat interaction and return the assistant's response.
+    
+    Processes the incoming ChatRequest (creating or reusing a session as needed), runs the RAG agent with the provided message and session context, and returns a ChatResponse containing the assistant message, session ID, tools used, and metadata.
+    
+    Parameters:
+        chat_request (ChatRequest): Client payload containing at minimum `message`. May also include `session_id` (to continue a session), `user_id`, and `search_type`, which influence session selection and search behavior.
+    
+    Returns:
+        ChatResponse: The assistant's reply, the session_id used, a list of tools invoked by the agent, and metadata (includes `search_type`).
+    
+    Raises:
+        HTTPException: Raised with status 500 if processing the request fails.
+    """
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
@@ -487,13 +531,53 @@ async def chat(request: Request, chat_request: ChatRequest):
 @app.post("/chat/stream")
 @limiter.limit("5/minute")
 async def chat_stream(request: Request, chat_request: ChatRequest):
-    """Streaming chat endpoint using Server-Sent Events."""
+    """
+    Stream a chat interaction as Server-Sent Events (SSE).
+    
+    Streams the agent's incremental text output for a single chat turn. Events emitted (as JSON in SSE `data:` lines):
+    - type "session": initial event containing the session_id.
+    - type "text": incremental text deltas produced by the model.
+    - type "tools": (optional) list of tool calls extracted from the final agent result.
+    - type "end": indicates the stream has finished.
+    - type "error": error information if the stream fails.
+    
+    Side effects:
+    - Ensures a session exists (creates one if needed).
+    - Immediately persists the user's message before streaming.
+    - Persists the final assistant message after streaming, including metadata about streaming and tool call count.
+    - Extracts and includes tool-call details from the agent result when present.
+    
+    Parameters:
+    - request: FastAPI Request object for the incoming HTTP connection (used for session/rate info).
+    - chat_request: ChatRequest payload containing at least `message` and optional `user_id`; used to build the prompt and dependencies.
+    
+    Returns:
+    - A StreamingResponse that emits SSE-formatted events with media type `text/event-stream`.
+    
+    Raises:
+    - HTTPException (500) on unexpected failures prior to returning the streaming response.
+    """
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
 
         async def generate_stream() -> AsyncGenerator[str, None]:
-            """Generate streaming response using agent.iter() pattern."""
+            """
+            Stream server-sent events (SSE) for a chat interaction using the agent's async iterator.
+            
+            Yields newline-delimited SSE data blocks (strings) representing a sequence of events:
+            - "session": initial event with the session_id.
+            - "text": incremental model output chunks as they are produced.
+            - "tools": final list of tool-call summaries used by the agent (if any).
+            - "end": end-of-stream marker.
+            - "error": emitted if an exception occurs during streaming.
+            
+            Side effects:
+            - Immediately persists the user's message (role="user") before streaming.
+            - Persists the assistant's final aggregated response (role="assistant") after streaming, including metadata about streaming and tool calls.
+            
+            The function obtains conversation context and constructs a combined prompt, drives the agent via rag_agent.iter, accumulates streamed text into the final response, and extracts tool-call information from the agent result to include in the emitted events.
+            """
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
