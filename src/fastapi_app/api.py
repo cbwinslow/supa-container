@@ -86,9 +86,7 @@ langfuse = Langfuse()
 
 # --- End OpenTelemetry ---
 
-# Set debug level for our module during development
-if APP_ENV == "development":
-    logger.setLevel(logging.DEBUG)
+
 
 
 
@@ -176,7 +174,21 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    """Custom response when rate limit is exceeded."""
+    """
+    Return a 429 JSONResponse when a rate limit is exceeded.
+    
+    Logs a warning (including the rate-limit key) and returns a JSON body with keys:
+    - error: short message,
+    - error_type: "RateLimitExceeded",
+    - request_id: a new UUID for tracing.
+    
+    Parameters:
+        request: FastAPI Request object for the current request (used to compute the rate-limit key).
+        exc: The RateLimitExceeded exception instance (not inspected by this handler).
+    
+    Returns:
+        JSONResponse with status code 429 and the JSON body described above.
+    """
     logger.warning(f"Rate limit exceeded: {rate_limit_key(request)}")
     return JSONResponse(
         status_code=429,
@@ -190,7 +202,19 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 # Helper functions for agent execution
 async def get_or_create_session(request: ChatRequest) -> str:
-    """Get existing session or create new one."""
+    """
+    Retrieve an existing session ID from the provided ChatRequest or create a new session.
+    
+    If request.session_id is present and corresponds to an existing session, that ID is returned.
+    Otherwise a new session is created using request.user_id and request.metadata and the new session_id is returned.
+    
+    Parameters:
+        request (ChatRequest): Incoming chat request; uses `session_id` to look up an existing session,
+            and `user_id`/`metadata` when creating a new session.
+    
+    Returns:
+        str: The existing or newly created session ID.
+    """
     if request.session_id:
         session = await get_session(request.session_id)
         if session:
@@ -458,7 +482,6 @@ async def health_check():
 
 @app.post("/chat", response_model=ChatResponse)
 
-    """Non-streaming chat endpoint."""
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
@@ -484,14 +507,12 @@ async def health_check():
 
 @app.post("/chat/stream")
 
-    """Streaming chat endpoint using Server-Sent Events."""
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
 
         async def generate_stream() -> AsyncGenerator[str, None]:
-            """Generate streaming response using agent.iter() pattern."""
-            run = None
+
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
