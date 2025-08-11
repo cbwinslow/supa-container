@@ -1,8 +1,9 @@
 import logging
-import os
 from logging.config import dictConfig
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+from settings import settings
+
+LOG_LEVEL = settings.log_level.upper()
 
 LOGGING_CONFIG = {
     "version": 1,

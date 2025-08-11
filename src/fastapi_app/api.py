@@ -9,14 +9,14 @@ from datetime import datetime
 import uuid
 
 
-from fastapi import FastAPI, HTTPException, Request, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import uvicorn
 
-
+from logging_config import get_logger
+from settings import settings
 
 from fastapi_app.agent import rag_agent, AgentDependencies
 from fastapi_app.db_utils import (
@@ -57,6 +57,17 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+
+# Application configuration
+logger = get_logger(__name__)
+security = HTTPBearer()
+limiter = Limiter(key_func=get_remote_address)
+
+ALLOWED_ORIGINS = settings.allowed_origins
+APP_HOST = settings.app_host
+APP_PORT = settings.app_port
+APP_ENV = settings.app_env
+LOG_LEVEL = settings.log_level
 
 # --- OpenTelemetry Instrumentation ---
 from opentelemetry import trace
@@ -171,6 +182,11 @@ app.add_middleware(
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+def rate_limit_key(request: Request) -> str:
+    """Generate a key for rate limiting based on client address."""
+    return get_remote_address(request)
 
 
 @app.exception_handler(RateLimitExceeded)

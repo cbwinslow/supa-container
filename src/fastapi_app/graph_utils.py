@@ -15,6 +15,7 @@ from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerCli
 
 
 
+from logging_config import get_logger
 from settings import settings
 
 logger = get_logger(__name__)
