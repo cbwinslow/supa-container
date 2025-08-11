@@ -1,32 +1,79 @@
 import logging
 from logging.config import dictConfig
 
-from settings import settings
-
-LOG_LEVEL = settings.log_level.upper()
-
-LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "standard": {
-            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        },
-    },
-    "handlers": {
-        "default": {
-            "class": "logging.StreamHandler",
-            "formatter": "standard",
-        },
-    },
-    "root": {
-        "handlers": ["default"],
-        "level": LOG_LEVEL,
-    },
-}
 
 def setup_logging() -> None:
-    """Configure root logger with standard settings."""
+    """
+    Configure logging for the application.
+    This function is idempotent and will not add duplicate handlers if called multiple times.
+    """
+    if logging.root.hasHandlers():
+        return
+
+    formatters = {
+        "standard": {
+_LOGGING_CONFIGURED = False
+
+def setup_logging() -> None:
+    """
+    Configure logging for the application.
+    This function is idempotent and will not add duplicate handlers if called multiple times.
+    """
+    global _LOGGING_CONFIGURED
+    if _LOGGING_CONFIGURED:
+        },
+    }
+
+    handlers = {}
+    log_formatter = "standard"
+    if LOG_FORMAT == "json":
+        log_formatter = "json"
+        formatters["json"] = {
+            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
+        }
+
+    if "console" in LOG_OUTPUT:
+        handlers["console"] = {
+            "class": "logging.StreamHandler",
+            "formatter": log_formatter,
+        try:
+            import pythonjsonlogger
+            log_formatter = "json"
+            formatters["json"] = {
+                "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+                "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
+            }
+        except ImportError:
+            warnings.warn(
+                "LOG_FORMAT=json requested but python-json-logger is not installed. Falling back to text format.",
+                RuntimeWarning,
+            )
+
+    if "file" in LOG_OUTPUT:
+        handlers["file"] = {
+            "class": "logging.FileHandler",
+            "formatter": log_formatter,
+            "filename": LOG_FILE_PATH,
+        }
+
+    if not handlers:
+        # Default to console if LOG_OUTPUT is misconfigured
+        handlers["console"] = {
+            "class": "logging.StreamHandler",
+            "formatter": log_formatter,
+        }
+
+    LOGGING_CONFIG = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": formatters,
+        "handlers": handlers,
+        "root": {
+            "handlers": list(handlers.keys()),
+            "level": LOG_LEVEL,
+        },
+    }
     dictConfig(LOGGING_CONFIG)
 
 
