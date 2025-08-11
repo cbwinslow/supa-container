@@ -1,6 +1,5 @@
 """Knowledge graph builder for extracting entities and relationships."""
 
-
 from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime, timezone
 import asyncio

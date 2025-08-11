@@ -8,8 +8,6 @@ import openai
 
 
 
-
-
 def get_llm_model(model_choice: Optional[str] = None) -> OpenAIModel:
     """
     Get LLM model configuration based on environment variables.
@@ -81,6 +79,7 @@ def validate_configuration() -> bool:
 
 
 
+
     return True
 
 def get_model_info() -> dict:
@@ -92,6 +91,5 @@ def get_model_info() -> dict:
     """
     return {
         "llm_provider": get_llm_provider(),
-
 
     }

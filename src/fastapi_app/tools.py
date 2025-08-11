@@ -1,6 +1,5 @@
 """Tools for the Pydantic AI agent."""
 
-
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
@@ -21,6 +20,7 @@ from .graph_utils import (
 )
 from .models import ChunkResult, GraphSearchResult, DocumentMetadata
 from .providers import get_embedding_client, get_embedding_model
+
 
 
 # Initialize embedding client with flexible provider

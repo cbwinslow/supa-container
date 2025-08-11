@@ -25,7 +25,6 @@ from logging_config import get_logger
 
 
 
-
 class DocumentIngestionPipeline:
     """Pipeline for ingesting documents into vector DB and knowledge graph."""
     

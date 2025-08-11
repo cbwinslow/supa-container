@@ -13,9 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
 
-from settings import settings
 
-from logging_config import get_logger
 
 from fastapi_app.agent import rag_agent, AgentDependencies
 from fastapi_app.db_utils import (
@@ -87,9 +85,6 @@ langfuse = Langfuse()
 # --- End Langfuse ---
 
 # --- End OpenTelemetry ---
-
-
-
 
 # Set debug level for our module during development
 if APP_ENV == "development":
