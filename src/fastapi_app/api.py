@@ -244,12 +244,12 @@ async def get_conversation_context(
 # Authentication dependency
 async def auth_dependency(authorization: str = Header(None)) -> str:
     """Simple bearer token authentication."""
-    if not authorization or not authorization.startswith("Bearer "):
+    if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token")
-    token = authorization.split(" ", 1)[1]
-    if not await verify_token(token):
+    token = authorization[7:]  # Extract everything after 'Bearer ' (case-insensitive)
+    if not await verify_token(token.strip()):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    return token
+    return token.strip()
 
 
 def extract_tool_calls(result: Any) -> List[ToolCall]:
