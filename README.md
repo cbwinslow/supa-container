@@ -24,6 +24,7 @@ This repository provides a one-click deployment script to set up the entire cont
     -   **Unified Dashboards (Grafana):** A single pane of glass for all metrics, logs, and traces.
     -   **Security Auditing:** A database-level audit log tracks all user actions.
     -   **Traffic Monitoring:** Traefik access logs are captured for security and performance analysis.
+    -   **Self-Healing Feedback:** An AI orchestrator analyses logs, monitoring exports and database state to launch specialised agents for automatic remediation.
 -   **Integrated Tooling:**
     -   **AI Prototyping Lab (Flowise):** A low-code UI for rapidly building and testing new AI flows.
     -   **Workflow Automation (n8n):** An integrated n8n instance for connecting your AI to other services.
