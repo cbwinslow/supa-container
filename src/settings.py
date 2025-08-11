@@ -1,35 +1,43 @@
-from pydantic import BaseSettings, Field
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    llm_api_key: str = Field(..., env="LLM_API_KEY")
-    database_url: str = Field(..., env="DATABASE_URL")
+    llm_api_key: str
+    database_url: str
 
-    llm_choice: str = Field("gpt-4-turbo-preview", env="LLM_CHOICE")
-    llm_base_url: str = Field("https://api.openai.com/v1", env="LLM_BASE_URL")
-    llm_provider: str = Field("openai", env="LLM_PROVIDER")
+    llm_choice: str = "gpt-4-turbo-preview"
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_provider: str = "openai"
 
-    embedding_api_key: str | None = Field(None, env="EMBEDDING_API_KEY")
-    embedding_base_url: str = Field("https://api.openai.com/v1", env="EMBEDDING_BASE_URL")
-    embedding_model: str = Field("text-embedding-3-small", env="EMBEDDING_MODEL")
-    embedding_provider: str = Field("openai", env="EMBEDDING_PROVIDER")
+    embedding_api_key: str | None = None
+    embedding_base_url: str = "https://api.openai.com/v1"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_provider: str = "openai"
 
-    ingestion_llm_choice: str | None = Field(None, env="INGESTION_LLM_CHOICE")
+    ingestion_llm_choice: str | None = None
 
-    app_env: str = Field("development", env="APP_ENV")
-    app_host: str = Field("0.0.0.0", env="APP_HOST")
-    app_port: int = Field(8000, env="APP_PORT")
-    log_level: str = Field("INFO", env="LOG_LEVEL")
+    app_env: str = "development"
+    app_host: str = "0.0.0.0"
+    app_port: int = 8000
+    log_level: str = "INFO"
+    api_auth_token: str
+    allowed_origins: list[str] = Field(default_factory=list)
 
-    neo4j_uri: str = Field("bolt://localhost:7687", env="NEO4J_URI")
-    neo4j_user: str = Field("neo4j", env="NEO4J_USER")
-    neo4j_password: str | None = Field(None, env="NEO4J_PASSWORD")
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_user: str = "neo4j"
+    neo4j_password: str | None = None
 
-    vector_dimension: int = Field(1536, env="VECTOR_DIMENSION")
+    vector_dimension: int = 1536
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def split_origins(cls, v: str | list[str]) -> list[str]:
+        if isinstance(v, str):
+            return [o.strip() for o in v.split(",") if o.strip()]
+        return v
+
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 settings = Settings()
