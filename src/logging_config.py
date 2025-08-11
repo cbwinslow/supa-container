@@ -3,29 +3,63 @@ import os
 from logging.config import dictConfig
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()
+LOG_OUTPUT = os.getenv("LOG_OUTPUT", "console").lower()
+LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "app.log")
 
-LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
+def setup_logging() -> None:
+    """
+    Configure logging for the application.
+    This function is idempotent and will not add duplicate handlers if called multiple times.
+    """
+    if logging.root.hasHandlers():
+        return
+
+    formatters = {
         "standard": {
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         },
-    },
-    "handlers": {
-        "default": {
-            "class": "logging.StreamHandler",
-            "formatter": "standard",
-        },
-    },
-    "root": {
-        "handlers": ["default"],
-        "level": LOG_LEVEL,
-    },
-}
+    }
 
-def setup_logging() -> None:
-    """Configure root logger with standard settings."""
+    handlers = {}
+    log_formatter = "standard"
+    if LOG_FORMAT == "json":
+        log_formatter = "json"
+        formatters["json"] = {
+            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
+        }
+
+    if "console" in LOG_OUTPUT:
+        handlers["console"] = {
+            "class": "logging.StreamHandler",
+            "formatter": log_formatter,
+        }
+
+    if "file" in LOG_OUTPUT:
+        handlers["file"] = {
+            "class": "logging.FileHandler",
+            "formatter": log_formatter,
+            "filename": LOG_FILE_PATH,
+        }
+
+    if not handlers:
+        # Default to console if LOG_OUTPUT is misconfigured
+        handlers["console"] = {
+            "class": "logging.StreamHandler",
+            "formatter": log_formatter,
+        }
+
+    LOGGING_CONFIG = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": formatters,
+        "handlers": handlers,
+        "root": {
+            "handlers": list(handlers.keys()),
+            "level": LOG_LEVEL,
+        },
+    }
     dictConfig(LOGGING_CONFIG)
 
 
