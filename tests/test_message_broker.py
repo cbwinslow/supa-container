@@ -45,14 +45,15 @@ class TestRabbitMQBroker:
         assert not broker.is_connected
         assert broker.connection is None
     
-    @patch('pika.adapters.asyncio_connection.AsyncioConnection')
-    async def test_broker_connect(self, mock_connection, broker):
+    @patch('message_broker.broker.AsyncioConnection')
+    async def test_broker_connect(self, mock_connection_class, broker):
         """Test broker connection."""
-        mock_connection.return_value = Mock()
+        mock_connection_instance = Mock()
+        mock_connection_class.return_value = mock_connection_instance
         
         await broker.connect()
         
-        mock_connection.assert_called_once()
+        mock_connection_class.assert_called_once()
     
     async def test_message_publishing(self, broker, sample_message):
         """Test message publishing functionality."""

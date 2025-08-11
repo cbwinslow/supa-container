@@ -1,0 +1,5 @@
+[rabbitmq_management].
+[rabbitmq_prometheus].
+[rabbitmq_tracing].
+[rabbitmq_shovel].
+[rabbitmq_federation].

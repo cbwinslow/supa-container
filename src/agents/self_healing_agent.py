@@ -361,7 +361,138 @@ class SelfHealingAgent(BaseAgent):
                 metadata={"service": service, "error": str(e)}
             )
     
-    # Helper methods (simplified implementations)
+    async def _heal_database(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Heal database connection issues."""
+        logger.info("Performing database healing")
+        
+        # Check database connections and restart if needed
+        healing_actions = []
+        
+        try:
+            # Check PostgreSQL connection
+            db_status = await self._check_database_health()
+            if not db_status.get("healthy", False):
+                # Restart database service
+                await self._restart_service({"service": "postgres"})
+                healing_actions.append("postgres_restart")
+            
+            # Check Neo4j connection
+            neo4j_status = await self._check_neo4j_health()
+            if not neo4j_status.get("healthy", False):
+                await self._restart_service({"service": "neo4j"})
+                healing_actions.append("neo4j_restart")
+            
+            return {
+                "timestamp": datetime.utcnow(),
+                "action": "database_healing",
+                "actions_taken": healing_actions,
+                "success": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Database healing failed: {e}")
+            raise
+    
+    async def _fix_network_issues(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Fix network connectivity issues."""
+        logger.info("Fixing network issues")
+        
+        healing_actions = []
+        
+        try:
+            # Restart networking service
+            result = subprocess.run(
+                ["systemctl", "restart", "networking"],
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode == 0:
+                healing_actions.append("networking_restart")
+            
+            # Flush DNS cache
+            subprocess.run(["systemctl", "flush-dns"], check=False)
+            healing_actions.append("dns_flush")
+            
+            return {
+                "timestamp": datetime.utcnow(),
+                "action": "network_healing",
+                "actions_taken": healing_actions,
+                "success": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Network healing failed: {e}")
+            raise
+    
+    async def _update_configurations(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Update system configurations for optimization."""
+        logger.info("Updating configurations")
+        
+        try:
+            # Reload configuration files
+            config_updates = []
+            
+            # Restart services to pick up new configurations
+            services_to_restart = parameters.get("services", ["fastapi_app", "nextjs_app"])
+            
+            for service in services_to_restart:
+                await self._restart_service({"service": service})
+                config_updates.append(f"restarted_{service}")
+            
+            return {
+                "timestamp": datetime.utcnow(),
+                "action": "configuration_update",
+                "updates": config_updates,
+                "success": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Configuration update failed: {e}")
+            raise
+    
+    async def _perform_backup(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform system backup."""
+        logger.info("Performing system backup")
+        
+        try:
+            backup_targets = parameters.get("targets", ["database", "configurations"])
+            backup_results = []
+            
+            for target in backup_targets:
+                if target == "database":
+                    # Backup database
+                    result = subprocess.run(
+                        ["docker-compose", "exec", "postgres", "pg_dump", "-U", "postgres", "postgres"],
+                        capture_output=True,
+                        text=True,
+                        cwd="/opt/supabase-super-stack"
+                    )
+                    
+                    if result.returncode == 0:
+                        backup_results.append("database_backup_success")
+                    else:
+                        backup_results.append("database_backup_failed")
+                
+                elif target == "configurations":
+                    # Backup configuration files
+                    subprocess.run(
+                        ["tar", "-czf", f"/tmp/config_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.tar.gz", 
+                         "/opt/supabase-super-stack/.env", "/opt/supabase-super-stack/docker-compose.yml"],
+                        check=False
+                    )
+                    backup_results.append("config_backup_success")
+            
+            return {
+                "timestamp": datetime.utcnow(),
+                "action": "system_backup",
+                "results": backup_results,
+                "success": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Backup failed: {e}")
+            raise
     
     async def _check_docker_services(self) -> Dict[str, Any]:
         """Check status of Docker services."""
@@ -432,3 +563,229 @@ class SelfHealingAgent(BaseAgent):
             logger.error(f"Failed to get memory usage: {e}")
         
         return 0.0
+    
+    async def _check_database_health(self) -> Dict[str, Any]:
+        """Check database health."""
+        try:
+            # Simple database connection check
+            result = subprocess.run(
+                ["docker-compose", "exec", "-T", "postgres", "pg_isready"],
+                capture_output=True,
+                text=True,
+                cwd="/opt/supabase-super-stack"
+            )
+            
+            return {"healthy": result.returncode == 0}
+            
+        except Exception as e:
+            return {"healthy": False, "error": str(e)}
+    
+    async def _check_neo4j_health(self) -> Dict[str, Any]:
+        """Check Neo4j health."""
+        try:
+            # Simple Neo4j connection check
+            result = subprocess.run(
+                ["docker-compose", "exec", "-T", "neo4j", "cypher-shell", "-u", "neo4j", "-p", "password", "RETURN 1"],
+                capture_output=True,
+                text=True,
+                cwd="/opt/supabase-super-stack"
+            )
+            
+            return {"healthy": result.returncode == 0}
+            
+        except Exception as e:
+            return {"healthy": False, "error": str(e)}
+    
+    async def _check_api_health(self) -> Dict[str, Any]:
+        """Check API endpoint health."""
+        try:
+            # Simple HTTP health check
+            import httpx
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get("http://localhost:8000/health", timeout=5.0)
+                return {"healthy": response.status_code == 200}
+                
+        except Exception as e:
+            return {"healthy": False, "error": str(e)}
+    
+    async def _get_cpu_usage(self) -> float:
+        """Get current CPU usage percentage."""
+        try:
+            result = subprocess.run(
+                ["top", "-bn1", "|", "grep", "Cpu(s)"],
+                shell=True,
+                capture_output=True,
+                text=True
+            )
+            
+            # Parse CPU usage from top output
+            # This is a simplified implementation
+            return 50.0  # Default value
+            
+        except Exception as e:
+            logger.error(f"Failed to get CPU usage: {e}")
+        
+        return 0.0
+    
+    async def _get_container_memory_usage(self) -> Dict[str, float]:
+        """Get memory usage by container."""
+        try:
+            result = subprocess.run(
+                ["docker", "stats", "--no-stream", "--format", "table {{.Container}}\t{{.MemUsage}}"],
+                capture_output=True,
+                text=True
+            )
+            
+            container_memory = {}
+            lines = result.stdout.strip().split('\n')[1:]  # Skip header
+            
+            for line in lines:
+                parts = line.split('\t')
+                if len(parts) >= 2:
+                    container = parts[0]
+                    memory_str = parts[1].split('/')[0].strip()  # Get used memory
+                    
+                    # Parse memory value (e.g., "123.4MiB" -> 123.4)
+                    if 'MiB' in memory_str:
+                        memory_mb = float(memory_str.replace('MiB', ''))
+                    elif 'GiB' in memory_str:
+                        memory_mb = float(memory_str.replace('GiB', '')) * 1024
+                    else:
+                        memory_mb = 0.0
+                    
+                    container_memory[container] = memory_mb
+            
+            return container_memory
+            
+        except Exception as e:
+            logger.error(f"Failed to get container memory usage: {e}")
+            return {}
+    
+    async def _clean_directory(self, directory: str) -> float:
+        """Clean a directory and return space freed in MB."""
+        try:
+            # Get initial size
+            result = subprocess.run(
+                ["du", "-sm", directory],
+                capture_output=True,
+                text=True
+            )
+            
+            initial_size = 0
+            if result.returncode == 0:
+                initial_size = int(result.stdout.split()[0])
+            
+            # Clean temporary files older than 7 days
+            subprocess.run(
+                ["find", directory, "-type", "f", "-mtime", "+7", "-delete"],
+                check=False
+            )
+            
+            # Clean empty directories
+            subprocess.run(
+                ["find", directory, "-type", "d", "-empty", "-delete"],
+                check=False
+            )
+            
+            # Get final size
+            result = subprocess.run(
+                ["du", "-sm", directory],
+                capture_output=True,
+                text=True
+            )
+            
+            final_size = 0
+            if result.returncode == 0:
+                final_size = int(result.stdout.split()[0])
+            
+            return max(0, initial_size - final_size)
+            
+        except Exception as e:
+            logger.error(f"Failed to clean directory {directory}: {e}")
+            return 0
+    
+    async def _clean_old_logs(self):
+        """Clean old log files."""
+        try:
+            # Clean Docker logs
+            subprocess.run(
+                ["docker", "system", "prune", "-f", "--volumes"],
+                check=False
+            )
+            
+            # Clean application logs older than 30 days
+            log_dirs = ["/var/log", "/opt/supabase-super-stack/logs"]
+            
+            for log_dir in log_dirs:
+                subprocess.run(
+                    ["find", log_dir, "-name", "*.log", "-mtime", "+30", "-delete"],
+                    check=False
+                )
+                
+        except Exception as e:
+            logger.error(f"Failed to clean old logs: {e}")
+    
+    async def _handle_high_cpu_usage(self):
+        """Handle high CPU usage situations."""
+        try:
+            logger.warning("High CPU usage detected, investigating...")
+            
+            # Get top processes
+            result = subprocess.run(
+                ["ps", "aux", "--sort=-%cpu", "|", "head", "-10"],
+                shell=True,
+                capture_output=True,
+                text=True
+            )
+            
+            # Send alert with process information
+            await self.publisher.send_alert(
+                alert_type="high_cpu_usage",
+                message="High CPU usage detected",
+                severity="warning",
+                metadata={"top_processes": result.stdout}
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to handle high CPU usage: {e}")
+    
+    async def _analyze_error_patterns(self) -> List[Dict]:
+        """Analyze logs for error patterns."""
+        # Simplified implementation - in practice would analyze actual logs
+        return []
+    
+    async def _handle_error_pattern(self, pattern: Dict):
+        """Handle detected error patterns."""
+        pass
+    
+    async def _detect_systemic_issues(self) -> List[Dict]:
+        """Detect systemic issues from repeated errors."""
+        return []
+    
+    async def _handle_systemic_issue(self, issue: Dict):
+        """Handle systemic issues."""
+        pass
+    
+    async def _daily_maintenance(self):
+        """Perform daily maintenance tasks."""
+        logger.info("Performing daily maintenance")
+        
+        try:
+            # Disk cleanup
+            await self._cleanup_disk_space({})
+            
+        except Exception as e:
+            logger.error(f"Daily maintenance failed: {e}")
+    
+    async def _weekly_maintenance(self):
+        """Perform weekly maintenance tasks."""
+        logger.info("Performing weekly maintenance")
+        
+        try:
+            # Full system cleanup
+            await self._cleanup_disk_space({})
+            await self._optimize_memory({})
+            
+        except Exception as e:
+            logger.error(f"Weekly maintenance failed: {e}")

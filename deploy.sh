@@ -84,6 +84,13 @@ INGESTION_LLM_CHOICE=gpt-4.1-nano
 N8N_BASIC_AUTH_USER=admin
 N8N_BASIC_AUTH_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
 
+# --- RabbitMQ Message Broker ---
+RABBITMQ_USER=admin
+RABBITMQ_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
+RABBITMQ_HOST=rabbitmq
+RABBITMQ_PORT=5672
+RABBITMQ_MANAGEMENT_PORT=15672
+
 # --- Flowise Prototyping UI ---
 FLOWISE_USERNAME=admin
 FLOWISE_PASSWORD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32)
@@ -204,6 +211,7 @@ volumes:
   prometheus_data:
   grafana_data:
   loki_data:
+  rabbitmq_data:
 
 services:
   # --- 1. Edge Router & Load Balancer ---
@@ -316,7 +324,32 @@ services:
     networks: [devops-net]
     # No ports exposed to the web
 
-  # --- 8. Local AI Model Serving ---
+  # --- 8. Message Broker (RabbitMQ) ---
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    volumes: 
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    networks: [devops-net]
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-admin}
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit log_levels [{connection,error},{default,error}] disk_free_limit 2147483648
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      timeout: 30s
+      interval: 10s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.${DOMAIN}`)"
+      - "traefik.http.routers.rabbitmq.entrypoints=websecure"
+      - "traefik.http.routers.rabbitmq.tls.certresolver=myresolver"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
+
+  # --- 9. Local AI Model Serving ---
   localai:
     image: quay.io/go-skynet/local-ai:latest
     container_name: localai
