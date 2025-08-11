@@ -32,6 +32,7 @@
 | src/fastapi_app/tests/test_tools.py::test_graph_search_tool_handles_graph_error | PASSED |
 | tests/test_environment.py::test_ssh_command_available | PASSED |
 | tests/test_environment.py::test_fastapi_dockerfile_builds | SKIPPED |
+
 | tests/test_ingestion.py::test_simple_chunker_basic | PASSED |
 | tests/test_ingestion.py::test_embedder_caches_embeddings | PASSED |
 | tests/test_scripts.py::test_shell_scripts_use_strict_mode[config.sh] | PASSED |
@@ -42,4 +43,3 @@
 | tests/test_scripts.py::test_shell_scripts_use_strict_mode[push_to_remotes.sh] | PASSED |
 | tests/test_scripts.py::test_shell_scripts_use_strict_mode[tests/test_deploy.sh] | PASSED |
 
-**Summary**: 40 passed, 1 skipped

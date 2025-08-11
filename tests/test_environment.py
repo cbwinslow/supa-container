@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 from pathlib import Path
+
 import pytest
 
 
@@ -19,3 +20,4 @@ def test_fastapi_dockerfile_builds():
         text=True,
     )
     assert result.returncode == 0
+
