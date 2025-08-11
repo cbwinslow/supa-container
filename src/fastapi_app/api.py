@@ -96,6 +96,9 @@ ALLOWED_ORIGINS: List[str] = [
     for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+if not ALLOWED_ORIGINS:
+    logging.warning("ALLOWED_ORIGINS is empty. Defaulting to allow all origins ('*'). This may be insecure in production.")
+    ALLOWED_ORIGINS = ["*"]
 
 # Configure logging
 logging.basicConfig(
