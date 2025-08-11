@@ -11,7 +11,6 @@ from typing import Dict, Any, List, Optional, AsyncGenerator
 from datetime import datetime
 import uuid
 
-from fastapi import FastAPI, HTTPException, Request, Depends
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -29,7 +28,7 @@ from fastapi_app.db_utils import (
     add_message,
     get_session_messages,
     test_connection,
-    verify_auth_token,
+
 )
 from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
 from fastapi_app.models import (
@@ -240,6 +239,17 @@ async def get_conversation_context(
     messages = await get_session_messages(session_id, limit=max_messages)
 
     return [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+
+
+# Authentication dependency
+async def auth_dependency(authorization: Optional[str] = Header(None)) -> str:
+    """Simple bearer token authentication."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token")
+    token = authorization[7:]  # Extract everything after 'Bearer ' (case-insensitive)
+    if not await verify_token(token.strip()):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return token.strip()
 
 
 def extract_tool_calls(result: Any) -> List[ToolCall]:

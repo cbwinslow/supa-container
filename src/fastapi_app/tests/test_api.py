@@ -1,12 +1,5 @@
 import os
 
-
-@pytest.fixture(autouse=True)
-def set_env_vars(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
-    monkeypatch.setenv("NEO4J_PASSWORD", "password")
-    monkeypatch.setenv("LLM_API_KEY", "test-key")
-    monkeypatch.setenv("EMBEDDING_API_KEY", "embed-key")
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult, DocumentMetadata
 
@@ -45,6 +38,7 @@ def mock_db_utils():
             "add_message": mock_add,
             "get_session_messages": mock_get_messages,
         }
+
 
 
 @pytest.fixture
@@ -114,22 +108,18 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_database"] is True
 
 
-
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "new-session-123"
 
 
-
-    )
     assert response.status_code == 200
     mock_db_utils["get_session"].assert_called_with("existing-session-456")
     mock_db_utils["create_session"].assert_not_called()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "existing-session-456"
     assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
-
 
 
     # Mock the agent's streaming logic
@@ -142,19 +132,11 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
             yield f"data: {json.dumps({'type': 'tools', 'tools': [{'tool_name': 'test_tool'}]})}\n\n"
             yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
-        mock_iter.return_value.__aenter__.return_value = mock_streamer()  # type: ignore
-
-
         assert response.status_code == 200
         # In a real test client, you would iterate over the streaming response
         # Here we just confirm the endpoint is reachable and returns a streaming content type
         assert "text/event-stream" in response.headers["content-type"]
 
-    with patch(
-        "fastapi_app.tools.generate_embedding",
-        new_callable=AsyncMock,
-        return_value=[0.1] * 1536,
-    ):
 
         assert response.status_code == 200
         json_data = response.json()
@@ -164,7 +146,6 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
         mock_tools["vector"].assert_called_once()
 
 
-
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["search_type"] == "graph"
@@ -172,13 +153,6 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_results"][0]["fact"] == "graph search result"
     mock_tools["graph"].assert_called_once()
 
-
-
-    with patch(
-        "fastapi_app.tools.generate_embedding",
-        new_callable=AsyncMock,
-        return_value=[0.1] * 1536,
-    ):
 
         assert response.status_code == 200
         json_data = response.json()
