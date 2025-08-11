@@ -459,6 +459,7 @@ async def chat_stream(request: ChatRequest):
 
         async def generate_stream() -> AsyncGenerator[str, None]:
             """Generate streaming response using agent.iter() pattern."""
+            run = None
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
@@ -487,11 +488,12 @@ async def chat_stream(request: ChatRequest):
                 full_response = ""
 
                 # Stream using agent.iter() pattern
-                async with rag_agent.iter(full_prompt, deps=deps) as run:
-                    async for node in run:
+                async with rag_agent.iter(full_prompt, deps=deps) as r:
+                    run = r
+                    async for node in r:
                         if rag_agent.is_model_request_node(node):
                             # Stream tokens from the model
-                            async with node.stream(run.ctx) as request_stream:
+                            async with node.stream(r.ctx) as request_stream:
                                 async for event in request_stream:
                                     from pydantic_ai.messages import (
                                         PartStartEvent,
@@ -507,9 +509,10 @@ async def chat_stream(request: ChatRequest):
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                                    elif isinstance(
-                                        event, PartDeltaEvent
-                                    ) and isinstance(event.delta, TextPartDelta):
+                                    elif (
+                                        isinstance(event, PartDeltaEvent)
+                                        and isinstance(event.delta, TextPartDelta)
+                                    ):
                                         delta_content = event.delta.content_delta
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
@@ -538,12 +541,22 @@ async def chat_stream(request: ChatRequest):
                     metadata={"streamed": True, "tool_calls": len(tools_used)},
                 )
 
-                yield f"data: {json.dumps({'type': 'end'})}\n\n"
-
             except Exception as e:
                 logger.error(f"Stream error: {e}")
-                error_chunk = {"type": "error", "content": f"Stream error: {str(e)}"}
+                error_chunk = {"type": "error", "content": str(e)}
                 yield f"data: {json.dumps(error_chunk)}\n\n"
+            finally:
+                if run is not None:
+                    close_func = getattr(run, "aclose", None) or getattr(run, "close", None)
+                    if close_func:
+                        try:
+                            if asyncio.iscoroutinefunction(close_func):
+                                await close_func()
+                            else:
+                                close_func()
+                        except Exception as close_err:
+                            logger.error(f"Error closing run: {close_err}")
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
         return StreamingResponse(
             generate_stream(),
