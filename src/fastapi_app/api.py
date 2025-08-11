@@ -91,7 +91,7 @@ if APP_ENV == "development":
     logger.setLevel(logging.DEBUG)
 
 
-security = HTTPBearer()
+
 
 
 async def auth_dependency(
