@@ -33,9 +33,16 @@ def get_embedding_client() -> openai.AsyncOpenAI:
     Returns:
         Configured OpenAI-compatible client for embeddings
     """
+    import logging
+
     base_url = settings.embedding_base_url
+    if not settings.embedding_api_key:
+        logging.warning(
+            "EMBEDDING_API_KEY is not set. Falling back to LLM_API_KEY. "
+            "This may mask configuration errors. Please set EMBEDDING_API_KEY explicitly if possible."
+        )
     api_key = settings.embedding_api_key or settings.llm_api_key
-    
+
     return openai.AsyncOpenAI(
         base_url=base_url,
         api_key=api_key
