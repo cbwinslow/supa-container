@@ -1,4 +1,6 @@
 #!/bin/bash
+# Exit on error, undefined variable, and pipe failures
+set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # High-Level Configuration for Supabase Super Stack

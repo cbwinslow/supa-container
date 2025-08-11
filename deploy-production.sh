@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -e # Exit immediately if a command exits with a non-zero status.
+# Exit on error, undefined variable, and pipe failures
+set -euo pipefail
 
 # --- Configuration ---
 APP_ROOT="/opt/supabase-super-stack"

@@ -9,7 +9,8 @@
 # It should be the FIRST script you run after configuring config.sh.
 # -----------------------------------------------------------------------------
 
-set -e
+# Exit on error, undefined variable, and pipe failures
+set -euo pipefail
 
 # --- Source Configuration ---
 if [ -f "config.sh" ]; then

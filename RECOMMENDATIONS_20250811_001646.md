@@ -1,0 +1,140 @@
+# Recommendations - 2025-08-11 00:16:46 UTC
+
+- `#config.sh#`: review for consistency and completeness.
+- `.#config.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `.env.example`: review for consistency and completeness.
+- `.gitignore`: review for consistency and completeness.
+- `AGENT_INSTRUCTIONS.md`: keep documentation updated and check for typos.
+- `README.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/.env.example`: review for consistency and completeness.
+- `agentic-rag-knowledge-graph/.gitignore`: review for consistency and completeness.
+- `agentic-rag-knowledge-graph/CLAUDE.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/PLANNING.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/README.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/TASK.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/agent/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/agent.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/api.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/db_utils.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/graph_utils.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/models.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/prompts.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/providers.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/agent/tools.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc10_apple_ai_struggles.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc11_investment_funding_trends.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc12_executive_moves.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc13_regulatory_landscape.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc14_patent_innovation.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc15_competitive_analysis.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc16_startup_ecosystem.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc17_cloud_wars.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc18_future_predictions.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc19_acquisition_targets.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc1_openai_funding.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc20_international_competition.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc21_enterprise_adoption.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc2_anthropic_amazon.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc3_meta_scale_acquisition.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc4_databricks_funding.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc5_microsoft_openai_tensions.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc6_google_ai_strategy.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc7_sam_altman_profile.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc8_nvidia_dominance.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/big_tech_docs/doc9_ai_market_analysis.md`: keep documentation updated and check for typos.
+- `agentic-rag-knowledge-graph/cli.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/ingestion/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/ingestion/chunker.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/ingestion/embedder.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/ingestion/graph_builder.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/ingestion/ingest.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/pytest.ini`: review for consistency and completeness.
+- `agentic-rag-knowledge-graph/requirements.txt`: review for consistency and completeness.
+- `agentic-rag-knowledge-graph/sql/schema.sql`: add comments and review indexing for performance.
+- `agentic-rag-knowledge-graph/tests/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/tests/agent/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/tests/agent/test_db_utils.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/tests/agent/test_models.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/tests/conftest.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/tests/ingestion/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `agentic-rag-knowledge-graph/tests/ingestion/test_chunker.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `config.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `deploy-production.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `deploy.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `hetzner_app`: review for consistency and completeness.
+- `nextjs_app/Dockerfile`: pin base image versions and use multi-stage builds for smaller images.
+- `nextjs_app/components/Message.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/components/Sidebar.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/e2e/chat.spec.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/lib/opentelemetry.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/package.json`: audit dependencies regularly and lock versions.
+- `nextjs_app/pages/_app.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/pages/dashboard.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/pages/index.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/postcss.config.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/styles/globals.css`: review for consistency and completeness.
+- `nextjs_app/tailwind.config.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/tests/Message.test.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/tests/Sidebar.test.js`: ensure linting, error handling, and associated tests.
+- `nextjs_app/tests/index.test.js`: ensure linting, error handling, and associated tests.
+- `populate_secrets.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `post-deploy-setup.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `push_to_remotes.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `pytest.ini`: review for consistency and completeness.
+- `scripts/01_system_essentials.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/02_ssh_hardening.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/03_firewall_setup.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/04_web_server_nginx.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/05_php_setup.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/06_database_postgresql.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/07_nodejs_install.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/08_security_enhancements.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/09_system_tuning.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/10_antivirus_setup.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/11_ids_snort_setup.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/11_logging_monitoring_base.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/12_docker_base.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/13_message_queue_rabbitmq.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/14_metrics_prometheus_netdata.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/14_observability_base_stack.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/15_log_aggregation_loki_promtail.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/15_log_analysis_opensearch_docker.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/16_log_analysis_opensearch.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/16_realtime_monitoring_netdata.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/17_reverse_proxy_traefik_cloudflare_setup.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/18_ai_llm_rag_core_docker.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/18_ai_llm_rag_infra_setup.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/19_hashicorp_essentials.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/20_security_scanners_docker.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/21_observability_extensions_docker.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `scripts/load_test.js`: ensure linting, error handling, and associated tests.
+- `scripts/security_scan.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
+- `sql/audit.sql`: add comments and review indexing for performance.
+- `sql/schema.sql`: add comments and review indexing for performance.
+- `src/fastapi_app/Dockerfile`: pin base image versions and use multi-stage builds for smaller images.
+- `src/fastapi_app/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/agent.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/api.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/db_utils.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/graph_utils.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/models.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/prompts.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/providers.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/requirements.txt`: review for consistency and completeness.
+- `src/fastapi_app/tests/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tests/test_agent.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tests/test_api.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tests/test_db_utils.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tests/test_graph_utils.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tests/test_models.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tests/test_providers.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tests/test_tools.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/fastapi_app/tools.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/ingestion/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/ingestion/chunker.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/ingestion/embedder.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/ingestion/graph_builder.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `src/ingestion/ingest.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `tests/__init__.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `tests/conftest.py`: add type hints, docstrings, and ensure comprehensive tests.
+- `tests/test_deploy.sh`: consider adding `set -euo pipefail` and inline comments for clarity.
