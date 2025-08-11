@@ -34,10 +34,13 @@ from fastapi_app.models import (
     ChatResponse,
     SearchRequest,
     SearchResponse,
+    DocumentListRequest,
+    DocumentListResponse,
     StreamDelta,
     ErrorResponse,
     HealthStatus,
     ToolCall,
+    Session,
 )
 from fastapi_app.tools import (
     vector_search_tool,
@@ -560,7 +563,7 @@ async def chat_stream(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/search/vector")
+@app.post("/search/vector", response_model=SearchResponse)
 async def search_vector(request: SearchRequest):
     """Vector search endpoint."""
     try:
@@ -584,7 +587,7 @@ async def search_vector(request: SearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/search/graph")
+@app.post("/search/graph", response_model=SearchResponse)
 async def search_graph(request: SearchRequest):
     """Knowledge graph search endpoint."""
     try:
@@ -608,7 +611,7 @@ async def search_graph(request: SearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/search/hybrid")
+@app.post("/search/hybrid", response_model=SearchResponse)
 async def search_hybrid(request: SearchRequest):
     """Hybrid search endpoint."""
     try:
@@ -632,26 +635,26 @@ async def search_hybrid(request: SearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/documents")
-async def list_documents_endpoint(limit: int = 20, offset: int = 0):
+@app.get("/documents", response_model=DocumentListResponse)
+async def list_documents_endpoint(params: DocumentListRequest = Depends()):
     """List documents endpoint."""
     try:
-        input_data = DocumentListInput(limit=limit, offset=offset)
+        input_data = DocumentListInput(limit=params.limit, offset=params.offset)
         documents = await list_documents_tool(input_data)
 
-        return {
-            "documents": documents,
-            "total": len(documents),
-            "limit": limit,
-            "offset": offset,
-        }
+        return DocumentListResponse(
+            documents=documents,
+            total=len(documents),
+            limit=params.limit,
+            offset=params.offset,
+        )
 
     except Exception as e:
         logger.error(f"Document listing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/sessions/{session_id}")
+@app.get("/sessions/{session_id}", response_model=Session)
 async def get_session_info(session_id: str):
     """Get session information."""
     try:
@@ -659,7 +662,7 @@ async def get_session_info(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        return session
+        return Session(**session)
 
     except HTTPException:
         raise
