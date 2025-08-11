@@ -12,7 +12,8 @@
 #   3. Guide you on how to add these keys to your .env file.
 # -----------------------------------------------------------------------------
 
-set -e
+# Exit on error, undefined variable, and pipe failures
+set -euo pipefail
 
 # --- Configuration ---
 # The script assumes it is being run from the APP_ROOT directory.

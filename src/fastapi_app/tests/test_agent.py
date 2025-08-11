@@ -3,19 +3,20 @@ from unittest.mock import patch, AsyncMock
 from fastapi_app.agent import rag_agent, AgentDependencies
 from fastapi_app.providers import get_llm_model
 
-pytestmark = pytest.mark.asyncio
 
 def test_agent_initialization():
     """Tests that the agent and its dependencies initialize correctly."""
     assert rag_agent is not None
-    # Pydantic AI v2 uses a different structure, we verify the llm model is set
-    assert rag_agent.llm.model is not None
+    # Ensure the underlying model is configured
+    assert rag_agent.model.model_name is not None
 
     # Test AgentDependencies dataclass
     deps = AgentDependencies(session_id="test-session")
     assert deps.session_id == "test-session"
     assert deps.search_preferences["default_limit"] == 10
 
+
+@pytest.mark.asyncio
 async def test_agent_run_flow():
     """Mocks a full agent run to ensure the flow works."""
     # This is a high-level integration test of the agent's internal logic
@@ -30,20 +31,19 @@ async def test_agent_run_flow():
         mock_run.assert_called_once_with("test prompt", deps=deps)
         assert result.data == "Final mocked response"
 
+
 def test_agent_tools_are_registered():
     """Verifies that all expected tools are registered with the agent."""
-    # In Pydantic AI v2, tools are methods on the agent class instance
-    registered_tool_names = [tool.__name__ for tool in rag_agent.tools()]
-    
-    expected_tools = [
+    registered_tool_names = set(rag_agent._function_tools.keys())
+
+    expected_tools = {
         "vector_search",
         "graph_search",
         "hybrid_search",
         "get_document",
         "list_documents",
         "get_entity_relationships",
-        "get_entity_timeline"
-    ]
-    
-    for tool_name in expected_tools:
-        assert tool_name in registered_tool_names
+        "get_entity_timeline",
+    }
+
+    assert expected_tools.issubset(registered_tool_names)

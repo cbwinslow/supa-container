@@ -1,4 +1,6 @@
 #!/usr/bin/env bats
+# Exit on error, undefined variable, and pipe failures
+set -euo pipefail
 
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
