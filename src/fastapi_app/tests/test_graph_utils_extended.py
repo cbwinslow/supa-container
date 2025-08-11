@@ -13,6 +13,12 @@ pytestmark = pytest.mark.asyncio
 
 
 async def create_client_with_mock_graphiti():
+    """
+    Create a GraphitiClient configured for tests with its Graphiti dependency mocked.
+    
+    Returns:
+        GraphitiClient: A client instance with `_initialized` set to True and `graphiti` replaced by an AsyncMock whose `driver` attribute is set to the string "driver".
+    """
     client = GraphitiClient()
     client._initialized = True
     client.graphiti = AsyncMock()
