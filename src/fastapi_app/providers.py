@@ -1,11 +1,13 @@
 """Flexible provider configuration for LLM and embedding models."""
 
-
 from typing import Optional
+import logging
+import os
+import openai
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.models.openai import OpenAIModel
-import openai
 
+logger = logging.getLogger(__name__)
 
 
 def get_llm_model(model_choice: Optional[str] = None) -> OpenAIModel:
@@ -19,6 +21,9 @@ def get_llm_model(model_choice: Optional[str] = None) -> OpenAIModel:
         Configured OpenAI-compatible model
     """
 
+    llm_choice = model_choice or os.getenv("LLM_CHOICE")
+    base_url = os.getenv("LLM_BASE_URL")
+    api_key = os.getenv("LLM_API_KEY")
     provider = OpenAIProvider(base_url=base_url, api_key=api_key)
     return OpenAIModel(llm_choice, provider=provider)
 
@@ -30,7 +35,9 @@ def get_embedding_client() -> openai.AsyncOpenAI:
     Returns:
         Configured OpenAI-compatible client for embeddings
     """
-
+    base_url = os.getenv("EMBEDDING_BASE_URL")
+    api_key = os.getenv("EMBEDDING_API_KEY") or os.getenv("LLM_API_KEY")
+    return openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
 
 def get_embedding_model() -> str:
@@ -40,7 +47,7 @@ def get_embedding_model() -> str:
     Returns:
         Embedding model name
     """
-
+    return os.getenv("EMBEDDING_MODEL")
 
 
 def get_ingestion_model() -> OpenAIModel:
@@ -50,6 +57,7 @@ def get_ingestion_model() -> OpenAIModel:
     Returns:
         Configured model for ingestion tasks
     """
+    ingestion_choice = os.getenv("INGESTION_LLM_CHOICE")
 
     # If no specific ingestion model, use the main model
     if not ingestion_choice:
@@ -61,12 +69,12 @@ def get_ingestion_model() -> OpenAIModel:
 # Provider information functions
 def get_llm_provider() -> str:
     """Get the LLM provider name."""
-
+    return os.getenv("LLM_PROVIDER", "openai")
 
 
 def get_embedding_provider() -> str:
     """Get the embedding provider name."""
-
+    return os.getenv("EMBEDDING_PROVIDER", "openai")
 
 
 def validate_configuration() -> bool:
@@ -74,11 +82,20 @@ def validate_configuration() -> bool:
     Validate that required environment variables are set.
 
     Returns:
-
+        True if configuration is valid
     """
+    required_vars = {
+        "LLM_API_KEY": os.getenv("LLM_API_KEY"),
+        "LLM_CHOICE": os.getenv("LLM_CHOICE"),
+        "EMBEDDING_API_KEY": os.getenv("EMBEDDING_API_KEY") or os.getenv("LLM_API_KEY"),
+        "EMBEDDING_MODEL": os.getenv("EMBEDDING_MODEL"),
+    }
 
-
-
+    missing_vars = [name for name, value in required_vars.items() if not value]
+    if missing_vars:
+        message = f"Missing required environment variables: {', '.join(missing_vars)}"
+        logger.error(message)
+        raise RuntimeError(message)
 
     return True
 
@@ -91,5 +108,10 @@ def get_model_info() -> dict:
     """
     return {
         "llm_provider": get_llm_provider(),
-
+        "llm_model": os.getenv("LLM_CHOICE"),
+        "llm_base_url": os.getenv("LLM_BASE_URL"),
+        "embedding_provider": get_embedding_provider(),
+        "embedding_model": get_embedding_model(),
+        "embedding_base_url": os.getenv("EMBEDDING_BASE_URL"),
+        "ingestion_model": os.getenv("INGESTION_LLM_CHOICE") or "same as main",
     }
