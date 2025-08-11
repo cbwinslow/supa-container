@@ -189,6 +189,5 @@ async def test_rate_limit_exceeded(mock_db_utils, mock_agent_execution):
     response = None
     for _ in range(6):
         response = client.post("/chat", json={"message": "Hello"})
-    assert response is not None
     assert response.status_code == 429
     assert response.json()["error_type"] == "RateLimitExceeded"
