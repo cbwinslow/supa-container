@@ -91,7 +91,7 @@ def validate_configuration() -> bool:
     Validate that required environment variables are set.
 
     Returns:
-        True if configuration is valid
+        True if all required configuration is present
 
     Raises:
         RuntimeError: If required configuration is missing.
