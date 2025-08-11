@@ -12,6 +12,7 @@ from datetime import datetime
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -27,6 +28,7 @@ from fastapi_app.db_utils import (
     add_message,
     get_session_messages,
     test_connection,
+    verify_auth_token,
 )
 from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
 from fastapi_app.models import (
@@ -101,6 +103,19 @@ logging.basicConfig(
 # Set debug level for our module during development
 if APP_ENV == "development":
     logger.setLevel(logging.DEBUG)
+
+
+security = HTTPBearer()
+
+
+async def auth_dependency(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Simple bearer token authentication dependency."""
+    token = credentials.credentials
+    if not await verify_auth_token(token):
+        raise HTTPException(status_code=401, detail="Invalid or missing authentication")
+    return token
 
 
 @asynccontextmanager
@@ -427,7 +442,7 @@ async def health_check():
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, auth: str = Depends(auth_dependency)):
     """Non-streaming chat endpoint."""
     try:
         # Get or create session
@@ -451,7 +466,7 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, auth: str = Depends(auth_dependency)):
     """Streaming chat endpoint using Server-Sent Events."""
     try:
         # Get or create session
@@ -596,7 +611,7 @@ async def chat_stream(request: ChatRequest):
 
 
 @app.post("/search/vector")
-async def search_vector(request: SearchRequest):
+async def search_vector(request: SearchRequest, auth: str = Depends(auth_dependency)):
     """Vector search endpoint."""
     try:
         input_data = VectorSearchInput(query=request.query, limit=request.limit)
@@ -620,7 +635,7 @@ async def search_vector(request: SearchRequest):
 
 
 @app.post("/search/graph")
-async def search_graph(request: SearchRequest):
+async def search_graph(request: SearchRequest, auth: str = Depends(auth_dependency)):
     """Knowledge graph search endpoint."""
     try:
         input_data = GraphSearchInput(query=request.query)
@@ -644,7 +659,7 @@ async def search_graph(request: SearchRequest):
 
 
 @app.post("/search/hybrid")
-async def search_hybrid(request: SearchRequest):
+async def search_hybrid(request: SearchRequest, auth: str = Depends(auth_dependency)):
     """Hybrid search endpoint."""
     try:
         input_data = HybridSearchInput(query=request.query, limit=request.limit)
