@@ -1,8 +1,5 @@
-"""
-FastAPI endpoints for the agentic RAG system.
-"""
+"""FastAPI endpoints for the agentic RAG system."""
 
-import os
 import asyncio
 import json
 import logging
@@ -11,12 +8,12 @@ from typing import Dict, Any, List, Optional, AsyncGenerator
 from datetime import datetime
 import uuid
 
-from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import StreamingResponse, JSONResponse
+
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
-from dotenv import load_dotenv
+
+
 
 from fastapi_app.agent import rag_agent, AgentDependencies
 from fastapi_app.db_utils import (
@@ -27,6 +24,7 @@ from fastapi_app.db_utils import (
     add_message,
     get_session_messages,
     test_connection,
+
 )
 from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
 from fastapi_app.models import (
@@ -34,10 +32,13 @@ from fastapi_app.models import (
     ChatResponse,
     SearchRequest,
     SearchResponse,
+    DocumentListRequest,
+    DocumentListResponse,
     StreamDelta,
     ErrorResponse,
     HealthStatus,
     ToolCall,
+    Session,
 )
 from fastapi_app.tools import (
     vector_search_tool,
@@ -85,40 +86,20 @@ langfuse = Langfuse()
 
 # --- End OpenTelemetry ---
 
-# Load environment variables
-load_dotenv()
-
-logger = logging.getLogger(__name__)
 
 
-def rate_limit_key(request: Request) -> str:
-    """
-    Return the rate-limit key for the incoming request.
-    
-    Prefer the "X-User-ID" header value when present; otherwise fall back to the client's IP
-    (as returned by get_remote_address). The returned string is used as the per-request limiter key.
-    """
-    return request.headers.get("X-User-ID") or get_remote_address(request)
 
 
-limiter = Limiter(key_func=rate_limit_key, default_limits=["100/minute"])
 
 
-# Application configuration
-APP_ENV = os.getenv("APP_ENV", "development")
-APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
-APP_PORT = int(os.getenv("APP_PORT", 8000))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-
-# Set debug level for our module during development
-if APP_ENV == "development":
-    logger.setLevel(logging.DEBUG)
+async def auth_dependency(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """Simple bearer token authentication dependency."""
+    token = credentials.credentials
+    if not await verify_auth_token(token):
+        raise HTTPException(status_code=401, detail="Invalid or missing authentication")
+    return token
 
 
 @asynccontextmanager
@@ -182,7 +163,7 @@ FastAPIInstrumentor.instrument_app(app)
 # Add middleware with flexible CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -259,6 +240,17 @@ async def get_conversation_context(
     messages = await get_session_messages(session_id, limit=max_messages)
 
     return [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+
+
+# Authentication dependency
+async def auth_dependency(authorization: Optional[str] = Header(None)) -> str:
+    """Simple bearer token authentication."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token")
+    token = authorization[7:]  # Extract everything after 'Bearer ' (case-insensitive)
+    if not await verify_token(token.strip()):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return token.strip()
 
 
 def extract_tool_calls(result: Any) -> List[ToolCall]:
@@ -489,22 +481,7 @@ async def health_check():
 
 
 @app.post("/chat", response_model=ChatResponse)
-@limiter.limit("5/minute")
-async def chat(request: Request, chat_request: ChatRequest):
-    """
-    Handle a single non-streaming chat interaction and return the assistant's response.
-    
-    Processes the incoming ChatRequest (creating or reusing a session as needed), runs the RAG agent with the provided message and session context, and returns a ChatResponse containing the assistant message, session ID, tools used, and metadata.
-    
-    Parameters:
-        chat_request (ChatRequest): Client payload containing at minimum `message`. May also include `session_id` (to continue a session), `user_id`, and `search_type`, which influence session selection and search behavior.
-    
-    Returns:
-        ChatResponse: The assistant's reply, the session_id used, a list of tools invoked by the agent, and metadata (includes `search_type`).
-    
-    Raises:
-        HTTPException: Raised with status 500 if processing the request fails.
-    """
+
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
@@ -529,55 +506,13 @@ async def chat(request: Request, chat_request: ChatRequest):
 
 
 @app.post("/chat/stream")
-@limiter.limit("5/minute")
-async def chat_stream(request: Request, chat_request: ChatRequest):
-    """
-    Stream a chat interaction as Server-Sent Events (SSE).
-    
-    Streams the agent's incremental text output for a single chat turn. Events emitted (as JSON in SSE `data:` lines):
-    - type "session": initial event containing the session_id.
-    - type "text": incremental text deltas produced by the model.
-    - type "tools": (optional) list of tool calls extracted from the final agent result.
-    - type "end": indicates the stream has finished.
-    - type "error": error information if the stream fails.
-    
-    Side effects:
-    - Ensures a session exists (creates one if needed).
-    - Immediately persists the user's message before streaming.
-    - Persists the final assistant message after streaming, including metadata about streaming and tool call count.
-    - Extracts and includes tool-call details from the agent result when present.
-    
-    Parameters:
-    - request: FastAPI Request object for the incoming HTTP connection (used for session/rate info).
-    - chat_request: ChatRequest payload containing at least `message` and optional `user_id`; used to build the prompt and dependencies.
-    
-    Returns:
-    - A StreamingResponse that emits SSE-formatted events with media type `text/event-stream`.
-    
-    Raises:
-    - HTTPException (500) on unexpected failures prior to returning the streaming response.
-    """
+
     try:
         # Get or create session
         session_id = await get_or_create_session(chat_request)
 
         async def generate_stream() -> AsyncGenerator[str, None]:
-            """
-            Stream server-sent events (SSE) for a chat interaction using the agent's async iterator.
-            
-            Yields newline-delimited SSE data blocks (strings) representing a sequence of events:
-            - "session": initial event with the session_id.
-            - "text": incremental model output chunks as they are produced.
-            - "tools": final list of tool-call summaries used by the agent (if any).
-            - "end": end-of-stream marker.
-            - "error": emitted if an exception occurs during streaming.
-            
-            Side effects:
-            - Immediately persists the user's message (role="user") before streaming.
-            - Persists the assistant's final aggregated response (role="assistant") after streaming, including metadata about streaming and tool calls.
-            
-            The function obtains conversation context and constructs a combined prompt, drives the agent via rag_agent.iter, accumulates streamed text into the final response, and extracts tool-call information from the agent result to include in the emitted events.
-            """
+
             try:
                 yield f"data: {json.dumps({'type': 'session', 'session_id': session_id})}\n\n"
 
@@ -595,7 +530,7 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                     context_str = "\n".join(
                         [f"{msg['role']}: {msg['content']}" for msg in context[-6:]]
                     )
-                    full_prompt = f"Previous conversation:\n{context_str}\n\nCurrent question: {chat_request.message}"
+
 
                 # Save user message immediately
                 await add_message(
@@ -608,11 +543,7 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                 full_response = ""
 
                 # Stream using agent.iter() pattern
-                async with rag_agent.iter(full_prompt, deps=deps) as run:
-                    async for node in run:
-                        if rag_agent.is_model_request_node(node):
-                            # Stream tokens from the model
-                            async with node.stream(run.ctx) as request_stream:
+
                                 async for event in request_stream:
                                     from pydantic_ai.messages import (
                                         PartStartEvent,
@@ -628,16 +559,20 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                                    elif isinstance(
-                                        event, PartDeltaEvent
-                                    ) and isinstance(event.delta, TextPartDelta):
+                                    elif (
+                                        isinstance(event, PartDeltaEvent)
+                                        and isinstance(event.delta, TextPartDelta)
+                                    ):
                                         delta_content = event.delta.content_delta
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                # Extract tools used from the final result
-                result = run.result
-                tools_used = extract_tool_calls(result)
+                if run is not None:
+                    # Extract tools used from the final result
+                    result = run.result
+                    tools_used = extract_tool_calls(result)
+                else:
+                    tools_used = []
 
                 # Send tools used information
                 if tools_used:
@@ -659,12 +594,12 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                     metadata={"streamed": True, "tool_calls": len(tools_used)},
                 )
 
-                yield f"data: {json.dumps({'type': 'end'})}\n\n"
-
             except Exception as e:
                 logger.error(f"Stream error: {e}")
-                error_chunk = {"type": "error", "content": f"Stream error: {str(e)}"}
-                yield f"data: {json.dumps(error_chunk)}\n\n"
+
+                    except Exception as close_err:
+                        logger.error(f"Error closing run: {close_err}")
+                yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
         return StreamingResponse(
             generate_stream(),
@@ -681,8 +616,7 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/search/vector")
-async def search_vector(request: SearchRequest):
+
     """Vector search endpoint."""
     try:
         input_data = VectorSearchInput(query=request.query, limit=request.limit)
@@ -704,9 +638,6 @@ async def search_vector(request: SearchRequest):
         logger.error(f"Vector search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.post("/search/graph")
-async def search_graph(request: SearchRequest):
     """Knowledge graph search endpoint."""
     try:
         input_data = GraphSearchInput(query=request.query)
@@ -729,8 +660,7 @@ async def search_graph(request: SearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/search/hybrid")
-async def search_hybrid(request: SearchRequest):
+
     """Hybrid search endpoint."""
     try:
         input_data = HybridSearchInput(query=request.query, limit=request.limit)
@@ -753,26 +683,26 @@ async def search_hybrid(request: SearchRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/documents")
-async def list_documents_endpoint(limit: int = 20, offset: int = 0):
+@app.get("/documents", response_model=DocumentListResponse)
+async def list_documents_endpoint(params: DocumentListRequest = Depends()):
     """List documents endpoint."""
     try:
-        input_data = DocumentListInput(limit=limit, offset=offset)
+        input_data = DocumentListInput(limit=params.limit, offset=params.offset)
         documents = await list_documents_tool(input_data)
 
-        return {
-            "documents": documents,
-            "total": len(documents),
-            "limit": limit,
-            "offset": offset,
-        }
+        return DocumentListResponse(
+            documents=documents,
+            total=len(documents),
+            limit=params.limit,
+            offset=params.offset,
+        )
 
     except Exception as e:
         logger.error(f"Document listing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/sessions/{session_id}")
+@app.get("/sessions/{session_id}", response_model=Session)
 async def get_session_info(session_id: str):
     """Get session information."""
     try:
@@ -780,7 +710,7 @@ async def get_session_info(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        return session
+        return Session(**session)
 
     except HTTPException:
         raise
@@ -794,10 +724,19 @@ async def get_session_info(session_id: str):
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
+    request_id = str(uuid.uuid4())
+    details = getattr(exc, "detail", None)
+    if details is not None and not isinstance(details, dict):
+        details = {"detail": details}
 
-    return ErrorResponse(
-        error=str(exc), error_type=type(exc).__name__, request_id=str(uuid.uuid4())
+    error_response = ErrorResponse(
+        error=str(exc),
+        error_type=type(exc).__name__,
+        details=details,
+        request_id=request_id,
     )
+
+    return JSONResponse(status_code=500, content=error_response.model_dump())
 
 
 # Development server
