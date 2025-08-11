@@ -1,8 +1,5 @@
-"""
-FastAPI endpoints for the agentic RAG system.
-"""
+"""FastAPI endpoints for the agentic RAG system."""
 
-import os
 import asyncio
 import json
 import logging
@@ -16,7 +13,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
-from dotenv import load_dotenv
+
+from ..settings import settings
 
 from .agent import rag_agent, AgentDependencies
 from .db_utils import (
@@ -50,16 +48,13 @@ from .tools import (
     DocumentListInput
 )
 
-# Load environment variables
-load_dotenv()
-
 logger = logging.getLogger(__name__)
 
 # Application configuration
-APP_ENV = os.getenv("APP_ENV", "development")
-APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
-APP_PORT = int(os.getenv("APP_PORT", 8000))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+APP_ENV = settings.app_env
+APP_HOST = settings.app_host
+APP_PORT = settings.app_port
+LOG_LEVEL = settings.log_level
 
 # Configure logging
 logging.basicConfig(

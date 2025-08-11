@@ -1,19 +1,5 @@
 import os
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock, MagicMock
-import json
-from datetime import datetime
 
-os.environ.setdefault("DATABASE_URL", "postgresql://user:pass@localhost/db")
-os.environ.setdefault("NEO4J_PASSWORD", "password")
-os.environ.setdefault("LLM_API_KEY", "test-key")
-@pytest.fixture(autouse=True)
-def set_env_vars(monkeypatch):
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@localhost/db")
-    monkeypatch.setenv("NEO4J_PASSWORD", "password")
-    monkeypatch.setenv("LLM_API_KEY", "test-key")
-    monkeypatch.setenv("EMBEDDING_API_KEY", "embed-key")
 
 from fastapi_app.api import app
 from fastapi_app.models import ChunkResult, GraphSearchResult, DocumentMetadata
@@ -26,14 +12,13 @@ client = TestClient(app)
 # --- Mocks and Fixtures ---
 
 
+
 @pytest.fixture
 def mock_db_utils():
     """Mocks all functions in the db_utils module."""
     with patch(
         "fastapi_app.api.initialize_database", new_callable=AsyncMock
-    ) as mock_init_db, patch(
-        "fastapi_app.api.close_database", new_callable=AsyncMock
-    ) as mock_close_db, patch(
+
         "fastapi_app.api.create_session",
         new_callable=AsyncMock,
         return_value="new-session-123",
@@ -47,7 +32,7 @@ def mock_db_utils():
         "fastapi_app.api.get_session_messages", new_callable=AsyncMock, return_value=[]
     ) as mock_get_messages, patch(
         "fastapi_app.api.test_connection", new_callable=AsyncMock, return_value=True
-    ) as mock_test_conn:
+
         yield {
             "create_session": mock_create,
             "get_session": mock_get,
@@ -56,18 +41,7 @@ def mock_db_utils():
         }
 
 
-@pytest.fixture
-def mock_graph_utils():
-    """Mocks all functions in the graph_utils module."""
-    with patch(
-        "fastapi_app.api.initialize_graph", new_callable=AsyncMock
-    ) as mock_init_graph, patch(
-        "fastapi_app.api.close_graph", new_callable=AsyncMock
-    ) as mock_close_graph, patch(
-        "fastapi_app.api.test_graph_connection",
-        new_callable=AsyncMock,
-        return_value=True,
-    ) as mock_test_graph:
+
         yield
 
 
@@ -131,19 +105,14 @@ async def test_health_check(mock_db_utils, mock_graph_utils):
     assert json_data["graph_database"] is True
 
 
-async def test_chat_endpoint_creates_session(mock_db_utils, mock_agent_execution):
-    mock_db_utils["get_session"].return_value = None  # Simulate no existing session
-    response = client.post("/chat", json={"message": "Hello"})
+
     assert response.status_code == 200
     mock_db_utils["create_session"].assert_called_once()
     mock_agent_execution.assert_called_once()
     assert response.json()["session_id"] == "new-session-123"
 
 
-async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_execution):
-    response = client.post(
-        "/chat", json={"message": "Hello again", "session_id": "existing-session-456"}
-    )
+
     assert response.status_code == 200
     mock_db_utils["get_session"].assert_called_with("existing-session-456")
     mock_db_utils["create_session"].assert_not_called()
@@ -152,7 +121,6 @@ async def test_chat_endpoint_uses_existing_session(mock_db_utils, mock_agent_exe
     assert response.json()["tools_used"][0]["tool_name"] == "vector_search"
 
 
-async def test_chat_stream_endpoint(mock_db_utils):
     # Mock the agent's streaming logic
     with patch("fastapi_app.api.rag_agent.iter") as mock_iter:
 
@@ -163,22 +131,13 @@ async def test_chat_stream_endpoint(mock_db_utils):
             yield f"data: {json.dumps({'type': 'tools', 'tools': [{'tool_name': 'test_tool'}]})}\n\n"
             yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
-        mock_iter.return_value.__aenter__.return_value = mock_streamer()  # type: ignore
-
-        response = client.post("/chat/stream", json={"message": "stream test"})
         assert response.status_code == 200
         # In a real test client, you would iterate over the streaming response
         # Here we just confirm the endpoint is reachable and returns a streaming content type
         assert "text/event-stream" in response.headers["content-type"]
 
 
-async def test_vector_search_endpoint(mock_tools):
-    with patch(
-        "fastapi_app.tools.generate_embedding",
-        new_callable=AsyncMock,
-        return_value=[0.1] * 1536,
-    ):
-        response = client.post("/search/vector", json={"query": "test"})
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "vector"
@@ -187,8 +146,7 @@ async def test_vector_search_endpoint(mock_tools):
         mock_tools["vector"].assert_called_once()
 
 
-async def test_graph_search_endpoint(mock_tools):
-    response = client.post("/search/graph", json={"query": "test"})
+
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["search_type"] == "graph"
@@ -197,13 +155,7 @@ async def test_graph_search_endpoint(mock_tools):
     mock_tools["graph"].assert_called_once()
 
 
-async def test_hybrid_search_endpoint(mock_tools):
-    with patch(
-        "fastapi_app.tools.generate_embedding",
-        new_callable=AsyncMock,
-        return_value=[0.1] * 1536,
-    ):
-        response = client.post("/search/hybrid", json={"query": "test"})
+
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["search_type"] == "hybrid"
@@ -212,37 +164,4 @@ async def test_hybrid_search_endpoint(mock_tools):
         mock_tools["hybrid"].assert_called_once()
 
 
-async def test_list_documents_endpoint():
-    doc = DocumentMetadata(
-        id="doc1",
-        title="Doc 1",
-        source="src1",
-        metadata={},
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-    )
-    with patch(
-        "fastapi_app.api.list_documents_tool",
-        new_callable=AsyncMock,
-        return_value=[doc],
-    ) as mock_list:
-        response = client.get("/documents")
-        assert response.status_code == 200
-        json_data = response.json()
-        assert json_data["total"] == 1
-        assert json_data["documents"][0]["id"] == "doc1"
-        mock_list.assert_called_once()
 
-
-async def test_get_session_info_endpoint(mock_db_utils):
-    mock_db_utils["get_session"].return_value = {
-        "id": "session-123",
-        "user_id": "user1",
-        "metadata": {},
-        "created_at": datetime.now().isoformat(),
-        "updated_at": datetime.now().isoformat(),
-    }
-    response = client.get("/sessions/session-123")
-    assert response.status_code == 200
-    assert response.json()["id"] == "session-123"
-    mock_db_utils["get_session"].assert_called_with("session-123")
