@@ -1,16 +1,11 @@
-"""
-Tools for the Pydantic AI agent.
-"""
+"""Tools for the Pydantic AI agent."""
 
-import os
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import asyncio
 
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
-
 from .db_utils import (
     vector_search,
     hybrid_search,
@@ -25,9 +20,6 @@ from .graph_utils import (
 )
 from .models import ChunkResult, GraphSearchResult, DocumentMetadata
 from .providers import get_embedding_client, get_embedding_model
-
-# Load environment variables
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 
