@@ -4,6 +4,18 @@ Supa-Container is a complete, production-grade platform for building, deploying,
 
 This repository provides a one-click deployment script to set up the entire containerized environment on your server.
 
+## 🚀 Quick Start for opendiscourse.net
+
+**Ready for immediate production deployment on Hetzner!**
+
+```bash
+git clone https://github.com/cbwinslow/hetzner_app.git
+cd hetzner_app
+sudo bash deploy-master.sh
+```
+
+📖 **[Complete Deployment Guide](README-DEPLOYMENT.md)** - Production deployment with AI orchestrator and specialized agents
+
 ---
 
 ## Features

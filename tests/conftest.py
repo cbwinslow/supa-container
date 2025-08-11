@@ -15,6 +15,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/tes
 os.environ.setdefault("NEO4J_URI", "bolt://localhost:7687")
 os.environ.setdefault("NEO4J_USER", "neo4j")
 os.environ.setdefault("NEO4J_PASSWORD", "test_password")
+os.environ.setdefault("API_AUTH_TOKEN", "test-auth-token-123")
 # Flexible provider configuration for tests
 os.environ.setdefault("LLM_PROVIDER", "openai")
 os.environ.setdefault("LLM_BASE_URL", "https://api.openai.com/v1")

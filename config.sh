@@ -12,10 +12,10 @@ set -euo pipefail
 # --- Domain and Email ---
 # The primary domain you will use for all services.
 # IMPORTANT: You must own this domain and be able to configure its DNS.
-export DOMAIN="your-domain.com"
+export DOMAIN="opendiscourse.net"
 
 # The email address to use for Let's Encrypt SSL certificate registration.
-export LETSENCRYPT_EMAIL="your-email@your-domain.com"
+export LETSENCRYPT_EMAIL="admin@opendiscourse.net"
 
 
 # --- Installation Directories ---
