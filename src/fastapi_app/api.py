@@ -242,7 +242,7 @@ async def get_conversation_context(
 
 
 # Authentication dependency
-async def auth_dependency(authorization: str = Header(None)) -> str:
+async def auth_dependency(authorization: Optional[str] = Header(None)) -> str:
     """Simple bearer token authentication."""
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token")
