@@ -1,18 +1,10 @@
-"""
-Semantic chunking implementation for intelligent document splitting.
-"""
+"""Semantic chunking implementation for intelligent document splitting."""
 
-import os
 import re
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 import asyncio
-
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 
