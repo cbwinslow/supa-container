@@ -50,6 +50,22 @@ def test_file_handler_is_added():
     if os.path.exists("test.log"):
         os.remove("test.log")
 
+@patch.dict(os.environ, {"LOG_OUTPUT": "console,file", "LOG_FILE_PATH": "test.log"}, clear=True)
+def test_console_and_file_handlers_are_added():
+    """Verify that both StreamHandler and FileHandler are added when LOG_OUTPUT is 'console,file'."""
+    clear_root_handlers()
+    importlib.reload(logging_config)
+
+    handlers = logging.root.handlers
+    assert len(handlers) == 2
+    stream_handler_found = any(isinstance(h, logging.StreamHandler) for h in handlers)
+    file_handler_found = any(isinstance(h, logging.FileHandler) for h in handlers)
+    assert stream_handler_found, "StreamHandler not found in handlers"
+    assert file_handler_found, "FileHandler not found in handlers"
+    # Clean up the created log file
+    if os.path.exists("test.log"):
+        os.remove("test.log")
+
 @patch.dict(os.environ, {"LOG_FORMAT": "json"}, clear=True)
 def test_json_formatter_is_used():
     """Verify that the JsonFormatter is used when LOG_FORMAT is 'json'."""
