@@ -1,0 +1,92 @@
+version: '3.9'
+services:
+  neo4j:
+    image: neo4j:5
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+    environment:
+      - NEO4J_AUTH=neo4j/test
+
+  supabase-db:
+    image: supabase/postgres:15.1.1.10
+    ports:
+      - "5432:5432"
+    volumes:
+      - supabase_db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=postgres
+
+  supabase-rest:
+    image: supabase/postgrest:v10.2.6
+    depends_on:
+      - supabase-db
+    environment:
+      - PGRST_DB_URI=postgres://postgres:postgres@supabase-db:5432/postgres
+    ports:
+      - "3000:3000"
+
+  supabase-gotrue:
+    image: supabase/gotrue:v2.130.2
+    depends_on:
+      - supabase-db
+    environment:
+      - GOTRUE_DB_DRIVER=postgres
+      - DATABASE_URL=postgres://postgres:postgres@supabase-db:5432/postgres
+      - API_EXTERNAL_URL=http://localhost:9999
+    ports:
+      - "9999:9999"
+
+  supabase-realtime:
+    image: supabase/realtime:v2.19.3
+    depends_on:
+      - supabase-db
+    environment:
+      - DB_HOST=supabase-db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+    ports:
+      - "4000:4000"
+
+  supabase-storage:
+    image: supabase/storage-api:v0.40.8
+    depends_on:
+      - supabase-db
+    environment:
+      - ANON_KEY=anon-key
+      - SERVICE_KEY=service-role-key
+    ports:
+      - "5000:5000"
+
+  supabase-studio:
+    image: supabase/studio:20240421-2a5741b
+    depends_on:
+      - supabase-db
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "8080:3000"
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:10.4.5
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+
+volumes:
+  neo4j_data:
+  supabase_db:
+  grafana_data:
