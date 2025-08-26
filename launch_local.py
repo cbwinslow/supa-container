@@ -70,7 +70,10 @@ class ServiceManager:
             "LANGFUSE_SALT",
             "ENCRYPTION_KEY",
             "N8N_ENCRYPTION_KEY",
-            "N8N_USER_MANAGEMENT_JWT_SECRET"
+            "N8N_USER_MANAGEMENT_JWT_SECRET",
+            "CLICKHOUSE_PASSWORD",
+            "FLOWISE_USERNAME",
+            "FLOWISE_PASSWORD"
         ]
 
     def check_prerequisites(self) -> bool:
@@ -129,6 +132,12 @@ class ServiceManager:
         # Copy .env to local-ai-packaged directory
         local_ai_env = self.script_dir / "local-ai-packaged" / ".env"
         shutil.copy(env_file, local_ai_env)
+        
+        # Clone and set up Supabase if needed
+        if not self._setup_supabase():
+            logger.error(f"{Color.RED}Failed to set up Supabase{Color.NC}")
+            return False
+            
         logger.info(f"{Color.GREEN}✓ Environment files configured{Color.NC}")
         
         return True
@@ -152,8 +161,14 @@ class ServiceManager:
         updated = False
         for var in self.required_env_vars:
             if var not in env_dict or not env_dict[var]:
-                secret = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
-                env_dict[var] = secret
+                if var == "FLOWISE_USERNAME":
+                    env_dict[var] = "admin"
+                elif var == "FLOWISE_PASSWORD":
+                    secret = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(16))
+                    env_dict[var] = secret
+                else:
+                    secret = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+                    env_dict[var] = secret
                 updated = True
                 logger.info(f"{Color.YELLOW}Generated secret for {var}{Color.NC}")
         
@@ -162,6 +177,48 @@ class ServiceManager:
             with open(env_file, 'w') as f:
                 for key, value in env_dict.items():
                     f.write(f"{key}={value}\n")
+
+    def _setup_supabase(self) -> bool:
+        """Set up Supabase repository and configuration"""
+        supabase_dir = self.script_dir / "local-ai-packaged" / "supabase"
+        
+        if not supabase_dir.exists():
+            logger.info(f"{Color.YELLOW}Cloning Supabase repository...{Color.NC}")
+            try:
+                # Change to local-ai-packaged directory
+                old_cwd = os.getcwd()
+                os.chdir(self.script_dir / "local-ai-packaged")
+                
+                # Clone Supabase with sparse checkout
+                subprocess.run([
+                    "git", "clone", "--filter=blob:none", "--no-checkout",
+                    "https://github.com/supabase/supabase.git"
+                ], check=True)
+                
+                os.chdir("supabase")
+                subprocess.run(["git", "sparse-checkout", "init", "--cone"], check=True)
+                subprocess.run(["git", "sparse-checkout", "set", "docker"], check=True)
+                subprocess.run(["git", "checkout", "master"], check=True)
+                
+                # Return to original directory
+                os.chdir(old_cwd)
+                
+                logger.info(f"{Color.GREEN}✓ Supabase repository cloned{Color.NC}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"{Color.RED}Failed to clone Supabase repository: {e}{Color.NC}")
+                os.chdir(old_cwd)
+                return False
+        else:
+            logger.info(f"{Color.GREEN}✓ Supabase repository already exists{Color.NC}")
+            
+        # Copy .env to Supabase docker directory
+        env_file = self.script_dir / ".env"
+        supabase_env_file = supabase_dir / "docker" / ".env"
+        if env_file.exists():
+            shutil.copy(env_file, supabase_env_file)
+            logger.info(f"{Color.GREEN}✓ Supabase environment configured{Color.NC}")
+            
+        return True
 
     def start_services(self) -> bool:
         """Start all services using the local-ai-packaged approach"""

@@ -30,6 +30,7 @@ usage() {
     echo ""
     echo "Commands:"
     echo "  start     Start all services (default)"
+    echo "  start-simple Start core services only (PostgreSQL, Redis, Neo4j, FastAPI)"
     echo "  stop      Stop all services"
     echo "  restart   Restart all services"
     echo "  status    Show service status"
@@ -116,9 +117,14 @@ main() {
             echo -e "${GREEN}🚀 Starting Supa Container services...${NC}"
             run_launcher start "$@"
             ;;
+        "start-simple")
+            echo -e "${GREEN}🚀 Starting core services only...${NC}"
+            python3 launch_simple.py start
+            ;;
         "stop")
             echo -e "${YELLOW}🛑 Stopping Supa Container services...${NC}"
             run_launcher --stop
+            python3 launch_simple.py stop  # Also stop simple services
             ;;
         "restart")
             echo -e "${YELLOW}🔄 Restarting Supa Container services...${NC}"
