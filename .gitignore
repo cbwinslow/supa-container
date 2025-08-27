@@ -38,3 +38,4 @@ bun.lockb
 .env
 Flowise/
 .env.test
+local-ai-packaged/supabase/
