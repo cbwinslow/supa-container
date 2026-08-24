@@ -6,11 +6,13 @@ from unittest.mock import patch, MagicMock
 # Import the module that configures logging
 import src.logging_config as logging_config
 
+
 def clear_root_handlers():
     """Remove all handlers from the root logger."""
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
         handler.close()
+
 
 @patch.dict(os.environ, {}, clear=True)
 def test_setup_logging_is_idempotent():
@@ -27,6 +29,7 @@ def test_setup_logging_is_idempotent():
     logging_config.setup_logging()
     assert len(logging.root.handlers) == initial_handler_count
 
+
 @patch.dict(os.environ, {"LOG_OUTPUT": "console"}, clear=True)
 def test_default_handler_is_console():
     """Verify that the default handler is a StreamHandler (console)."""
@@ -36,6 +39,7 @@ def test_default_handler_is_console():
     assert len(logging.root.handlers) == 1
     handler = logging.root.handlers[0]
     assert isinstance(handler, logging.StreamHandler)
+
 
 @patch.dict(os.environ, {"LOG_OUTPUT": "file", "LOG_FILE_PATH": "test.log"}, clear=True)
 def test_file_handler_is_added():
@@ -50,7 +54,10 @@ def test_file_handler_is_added():
     if os.path.exists("test.log"):
         os.remove("test.log")
 
-@patch.dict(os.environ, {"LOG_OUTPUT": "console,file", "LOG_FILE_PATH": "test.log"}, clear=True)
+
+@patch.dict(
+    os.environ, {"LOG_OUTPUT": "console,file", "LOG_FILE_PATH": "test.log"}, clear=True
+)
 def test_console_and_file_handlers_are_added():
     """Verify that both StreamHandler and FileHandler are added when LOG_OUTPUT is 'console,file'."""
     clear_root_handlers()
@@ -66,6 +73,7 @@ def test_console_and_file_handlers_are_added():
     if os.path.exists("test.log"):
         os.remove("test.log")
 
+
 @patch.dict(os.environ, {"LOG_FORMAT": "json"}, clear=True)
 def test_json_formatter_is_used(monkeypatch, caplog):
     """Verify that the JsonFormatter is used when LOG_FORMAT is 'json', and fallback behavior if unavailable."""
@@ -74,6 +82,7 @@ def test_json_formatter_is_used(monkeypatch, caplog):
 
     # Simulate ImportError for python-json-logger
     import builtins
+
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
@@ -87,23 +96,32 @@ def test_json_formatter_is_used(monkeypatch, caplog):
         importlib.reload(logging_config)
         handler = logging.root.handlers[0]
         # Should use standard formatter
-        assert not hasattr(handler.formatter, "jsonify"), "Fallback to standard formatter expected"
+        assert not hasattr(
+            handler.formatter, "jsonify"
+        ), "Fallback to standard formatter expected"
         # Should log a warning about missing dependency
-        assert any("python-json-logger" in r.message for r in caplog.records), "Warning about missing python-json-logger expected"
+        assert any(
+            "python-json-logger" in r.message for r in caplog.records
+        ), "Warning about missing python-json-logger expected"
 
     # Restore import for normal test
     monkeypatch.setattr(builtins, "__import__", real_import)
     try:
         from pythonjsonlogger.jsonlogger import JsonFormatter
+
         importlib.reload(logging_config)
         handler = logging.root.handlers[0]
-        assert isinstance(handler.formatter, JsonFormatter), "JsonFormatter should be used when available"
+        assert isinstance(
+            handler.formatter, JsonFormatter
+        ), "JsonFormatter should be used when available"
     except ImportError:
         # If not installed, fallback already tested above
         pass
 
     # Mock the JsonFormatter to check if it's instantiated
-    with patch('pythonjsonlogger.jsonlogger.JsonFormatter', MagicMock()) as mock_json_formatter:
+    with patch(
+        "pythonjsonlogger.jsonlogger.JsonFormatter", MagicMock()
+    ) as mock_json_formatter:
         importlib.reload(logging_config)
         # Check if the formatter of the handler is an instance of the mocked class
         assert len(logging.root.handlers) > 0
