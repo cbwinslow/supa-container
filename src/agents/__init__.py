@@ -3,7 +3,4 @@
 from .base_agent import BaseAgent
 from .self_healing_agent import SelfHealingAgent
 
-__all__ = [
-    "BaseAgent",
-    "SelfHealingAgent"
-]
+__all__ = ["BaseAgent", "SelfHealingAgent"]

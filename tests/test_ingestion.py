@@ -6,9 +6,10 @@ from unittest.mock import AsyncMock, patch
 
 def test_simple_chunker_basic():
     """Ensure the simple chunker splits text correctly."""
-    text = "Paragraph one.\n\nParagraph two that is a bit longer than the first." \
-
-    config = ChunkingConfig(chunk_size=50, chunk_overlap=10, use_semantic_splitting=False)
+    text = "Paragraph one.\n\nParagraph two that is a bit longer than the first."
+    config = ChunkingConfig(
+        chunk_size=50, chunk_overlap=10, use_semantic_splitting=False
+    )
     chunker = create_chunker(config)
     chunks = chunker.chunk_document(text, title="Test", source="unit")
     assert len(chunks) >= 2
