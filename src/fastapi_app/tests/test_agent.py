@@ -20,7 +20,7 @@ def test_agent_initialization():
 async def test_agent_run_flow():
     """Mocks a full agent run to ensure the flow works."""
     # This is a high-level integration test of the agent's internal logic
-    with patch('pydantic_ai.Agent.run', new_callable=AsyncMock) as mock_run:
+    with patch("pydantic_ai.Agent.run", new_callable=AsyncMock) as mock_run:
         mock_result = AsyncMock()
         mock_result.data = "Final mocked response"
         mock_run.return_value = mock_result

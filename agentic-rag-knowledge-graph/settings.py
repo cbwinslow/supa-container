@@ -1,5 +1,6 @@
 from pydantic import BaseSettings, Field
 
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -11,7 +12,9 @@ class Settings(BaseSettings):
     llm_provider: str = Field("openai", env="LLM_PROVIDER")
 
     embedding_api_key: str | None = Field(None, env="EMBEDDING_API_KEY")
-    embedding_base_url: str = Field("https://api.openai.com/v1", env="EMBEDDING_BASE_URL")
+    embedding_base_url: str = Field(
+        "https://api.openai.com/v1", env="EMBEDDING_BASE_URL"
+    )
     embedding_model: str = Field("text-embedding-3-small", env="EMBEDDING_MODEL")
     embedding_provider: str = Field("openai", env="EMBEDDING_PROVIDER")
 
@@ -31,5 +34,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
 
 settings = Settings()
