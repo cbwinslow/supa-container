@@ -157,9 +157,9 @@ async def get_session(session_id: str) -> Optional[Dict[str, Any]]:
                 "metadata": json.loads(result["metadata"]),
                 "created_at": result["created_at"].isoformat(),
                 "updated_at": result["updated_at"].isoformat(),
-                "expires_at": result["expires_at"].isoformat()
-                if result["expires_at"]
-                else None,
+                "expires_at": (
+                    result["expires_at"].isoformat() if result["expires_at"] else None
+                ),
             }
 
         return None
