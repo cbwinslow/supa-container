@@ -12,6 +12,7 @@ SCRIPTS = [
     pathlib.Path("tests/test_deploy.sh"),
 ]
 
+
 @pytest.mark.parametrize("script", SCRIPTS, ids=[str(s) for s in SCRIPTS])
 def test_shell_scripts_use_strict_mode(script: pathlib.Path) -> None:
     """Ensure that shell scripts enable strict mode for safer execution."""
