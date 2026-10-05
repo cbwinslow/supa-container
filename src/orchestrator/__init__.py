@@ -5,9 +5,4 @@ from .agent_manager import AgentManager
 from .task_scheduler import TaskScheduler
 from .data_analyzer import DataAnalyzer
 
-__all__ = [
-    "OrchestratorBrain",
-    "AgentManager", 
-    "TaskScheduler",
-    "DataAnalyzer"
-]
+__all__ = ["OrchestratorBrain", "AgentManager", "TaskScheduler", "DataAnalyzer"]

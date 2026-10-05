@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class MessageType(str, Enum):
     """Types of messages that can be sent between agents."""
+
     TASK_REQUEST = "task_request"
     TASK_RESPONSE = "task_response"
     STATUS_UPDATE = "status_update"
@@ -20,6 +21,7 @@ class MessageType(str, Enum):
 
 class Priority(str, Enum):
     """Message priority levels."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -28,6 +30,7 @@ class Priority(str, Enum):
 
 class AgentType(str, Enum):
     """Types of agents in the system."""
+
     ORCHESTRATOR = "orchestrator"
     SELF_HEALING = "self_healing"
     MONITORING = "monitoring"
@@ -42,22 +45,30 @@ class AgentType(str, Enum):
 
 class AgentMessage(BaseModel):
     """Base message structure for agent communication."""
+
     id: str = Field(..., description="Unique message ID")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     message_type: MessageType
     sender_id: str = Field(..., description="ID of the sending agent")
     sender_type: AgentType
-    recipient_id: Optional[str] = Field(None, description="Specific recipient ID, None for broadcast")
-    recipient_type: Optional[AgentType] = Field(None, description="Type of recipient agent")
+    recipient_id: Optional[str] = Field(
+        None, description="Specific recipient ID, None for broadcast"
+    )
+    recipient_type: Optional[AgentType] = Field(
+        None, description="Type of recipient agent"
+    )
     priority: Priority = Priority.NORMAL
     payload: Dict[str, Any] = Field(default_factory=dict)
-    correlation_id: Optional[str] = Field(None, description="For request-response tracking")
+    correlation_id: Optional[str] = Field(
+        None, description="For request-response tracking"
+    )
     reply_to: Optional[str] = Field(None, description="Queue to reply to")
     expires_at: Optional[datetime] = Field(None, description="Message expiration time")
 
 
 class AgentTask(BaseModel):
     """Task assignment message for agents."""
+
     task_id: str
     task_type: str
     description: str
@@ -71,6 +82,7 @@ class AgentTask(BaseModel):
 
 class AgentResponse(BaseModel):
     """Response message from agents."""
+
     task_id: str
     status: str  # success, error, in_progress, failed
     result: Optional[Dict[str, Any]] = None
@@ -81,6 +93,7 @@ class AgentResponse(BaseModel):
 
 class HealthCheckMessage(BaseModel):
     """Health check status message."""
+
     agent_id: str
     agent_type: AgentType
     status: str  # healthy, degraded, unhealthy
@@ -93,6 +106,7 @@ class HealthCheckMessage(BaseModel):
 
 class LogMessage(BaseModel):
     """Log data message."""
+
     level: str
     message: str
     source: str
@@ -102,6 +116,7 @@ class LogMessage(BaseModel):
 
 class MetricsMessage(BaseModel):
     """Metrics data message."""
+
     metric_name: str
     value: float
     unit: str
