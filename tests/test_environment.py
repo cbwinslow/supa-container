@@ -20,4 +20,3 @@ def test_fastapi_dockerfile_builds():
         text=True,
     )
     assert result.returncode == 0
-

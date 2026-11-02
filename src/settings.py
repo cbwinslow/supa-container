@@ -1,6 +1,7 @@
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
@@ -39,5 +40,6 @@ class Settings(BaseSettings):
         return v
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+
 
 settings = Settings()
