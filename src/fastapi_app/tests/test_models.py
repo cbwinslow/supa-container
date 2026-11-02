@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 from fastapi_app.models import ChatRequest, SearchRequest, IngestionConfig, SearchType
 
+
 def test_chat_request_model():
     """Tests the ChatRequest model for valid and invalid data."""
     # Valid data
@@ -18,6 +19,7 @@ def test_chat_request_model():
     with pytest.raises(ValidationError):
         ChatRequest(session_id="123")
 
+
 def test_search_request_model_limits():
     """Tests the validation on the limit field of the SearchRequest model."""
     # Valid limit
@@ -31,6 +33,7 @@ def test_search_request_model_limits():
     # Limit too high
     with pytest.raises(ValidationError):
         SearchRequest(query="test", limit=51)
+
 
 def test_ingestion_config_validation():
     """Tests the validation logic in the IngestionConfig model."""

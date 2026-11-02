@@ -7,9 +7,9 @@ from .consumer import MessageConsumer
 
 __all__ = [
     "RabbitMQBroker",
-    "AgentMessage", 
+    "AgentMessage",
     "AgentTask",
     "AgentResponse",
     "MessagePublisher",
-    "MessageConsumer"
+    "MessageConsumer",
 ]

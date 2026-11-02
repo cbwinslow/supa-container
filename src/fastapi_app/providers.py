@@ -39,6 +39,7 @@ def get_ingestion_model():
 
 # Provider information functions
 
+
 def get_llm_provider() -> str:
     """Get the LLM provider name."""
     return os.getenv("LLM_PROVIDER", "openai")

@@ -9,6 +9,7 @@ import pytest
 
 # Note: Testing library/framework in use: Pytest with pytest-asyncio for async test support.
 
+
 # Utilities to create a fake asyncpg pool and connection
 class FakeConnection:
     def __init__(self):
@@ -94,7 +95,13 @@ def fake_pg(monkeypatch):
     conn = FakeConnection()
     pool = FakePool(conn)
 
-    async def _create_pool(url, min_size=5, max_size=20, max_inactive_connection_lifetime=300, command_timeout=60):
+    async def _create_pool(
+        url,
+        min_size=5,
+        max_size=20,
+        max_inactive_connection_lifetime=300,
+        command_timeout=60,
+    ):
         # Validate arguments passed
         assert isinstance(url, str) and url.startswith("postgresql://")
         return pool
@@ -102,12 +109,15 @@ def fake_pg(monkeypatch):
     # If asyncpg module isn't installed in this environment, create a stub
     if "asyncpg" not in sys.modules:
         asyncpg_stub = types.SimpleNamespace()
+
         async def _dummy():  # pragma: no cover - guard
             pass
+
         asyncpg_stub.create_pool = _create_pool
         sys.modules["asyncpg"] = asyncpg_stub
     else:
         import asyncpg  # type: ignore
+
         monkeypatch.setattr(asyncpg, "create_pool", _create_pool)
 
     return pool, conn
@@ -144,7 +154,9 @@ def db_utils_module(set_env, fake_pg, monkeypatch):
         try:
             module = importlib.import_module("fastapi_app.db_utils")
         except Exception as e:
-            raise AssertionError(f"Could not import db_utils module via known names; last error: {last_err}") from e
+            raise AssertionError(
+                f"Could not import db_utils module via known names; last error: {last_err}"
+            ) from e
 
     return module
 
@@ -161,6 +173,7 @@ async def test_verify_auth_token_missing_env(monkeypatch):
     # Re-import module to avoid cached env inside verify function (function reads os.getenv each call; reimport not required)
     # Just call directly:
     from fastapi_app import db_utils as m
+
     assert await m.verify_auth_token("anything") is False
 
 
@@ -225,14 +238,16 @@ async def test_get_session_when_found_and_when_expired(db_utils_module, fake_pg)
     pool, conn = fake_pg
     now = datetime.now(timezone.utc)
     # Found
-    conn.program_fetchrow({
-        "id": "abcd",
-        "user_id": "userX",
-        "metadata": json.dumps({"x": 2}),
-        "created_at": now - timedelta(minutes=2),
-        "updated_at": now - timedelta(minutes=1),
-        "expires_at": now + timedelta(minutes=10),
-    })
+    conn.program_fetchrow(
+        {
+            "id": "abcd",
+            "user_id": "userX",
+            "metadata": json.dumps({"x": 2}),
+            "created_at": now - timedelta(minutes=2),
+            "updated_at": now - timedelta(minutes=1),
+            "expires_at": now + timedelta(minutes=10),
+        }
+    )
     data = await m.get_session("abcd")
     assert data["id"] == "abcd"
     assert data["user_id"] == "userX"
@@ -279,8 +294,20 @@ async def test_get_session_messages_with_and_without_limit(db_utils_module, fake
     pool, conn = fake_pg
     now = datetime.now(timezone.utc)
     rows = [
-        {"id": "m1", "role": "user", "content": "a", "metadata": json.dumps({}), "created_at": now - timedelta(seconds=2)},
-        {"id": "m2", "role": "assistant", "content": "b", "metadata": json.dumps({"k": 1}), "created_at": now - timedelta(seconds=1)},
+        {
+            "id": "m1",
+            "role": "user",
+            "content": "a",
+            "metadata": json.dumps({}),
+            "created_at": now - timedelta(seconds=2),
+        },
+        {
+            "id": "m2",
+            "role": "assistant",
+            "content": "b",
+            "metadata": json.dumps({"k": 1}),
+            "created_at": now - timedelta(seconds=1),
+        },
     ]
     conn.program_fetch(rows)
     res = await m.get_session_messages("sid")
@@ -300,10 +327,17 @@ async def test_get_document_found_and_not_found(db_utils_module, fake_pg):
     m = db_utils_module
     pool, conn = fake_pg
     now = datetime.now(timezone.utc)
-    conn.program_fetchrow({
-        "id": "d1", "title": "T", "source": "S", "content": "C",
-        "metadata": json.dumps({"a": 1}), "created_at": now, "updated_at": now
-    })
+    conn.program_fetchrow(
+        {
+            "id": "d1",
+            "title": "T",
+            "source": "S",
+            "content": "C",
+            "metadata": json.dumps({"a": 1}),
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
     doc = await m.get_document("d1")
     assert doc["title"] == "T"
     assert doc["metadata"] == {"a": 1}
@@ -313,14 +347,21 @@ async def test_get_document_found_and_not_found(db_utils_module, fake_pg):
 
 
 @pytest.mark.asyncio
-async def test_list_documents_with_and_without_metadata_filter(db_utils_module, fake_pg):
+async def test_list_documents_with_and_without_metadata_filter(
+    db_utils_module, fake_pg
+):
     m = db_utils_module
     pool, conn = fake_pg
     now = datetime.now(timezone.utc)
     rows = [
         {
-            "id": "d1", "title": "T1", "source": "S1", "metadata": json.dumps({"k": "v"}),
-            "created_at": now, "updated_at": now, "chunk_count": 3
+            "id": "d1",
+            "title": "T1",
+            "source": "S1",
+            "metadata": json.dumps({"k": "v"}),
+            "created_at": now,
+            "updated_at": now,
+            "chunk_count": 3,
         }
     ]
     conn.program_fetch(rows)
@@ -340,13 +381,20 @@ async def test_list_documents_with_and_without_metadata_filter(db_utils_module, 
 
 
 @pytest.mark.asyncio
-async def test_vector_search_converts_embedding_and_parses_results(db_utils_module, fake_pg):
+async def test_vector_search_converts_embedding_and_parses_results(
+    db_utils_module, fake_pg
+):
     m = db_utils_module
     pool, conn = fake_pg
     rows = [
         {
-            "chunk_id": "c1", "document_id": "d1", "content": "foo", "similarity": 0.9,
-            "metadata": json.dumps({"p": 1}), "document_title": "T", "document_source": "S"
+            "chunk_id": "c1",
+            "document_id": "d1",
+            "content": "foo",
+            "similarity": 0.9,
+            "metadata": json.dumps({"p": 1}),
+            "document_title": "T",
+            "document_source": "S",
         }
     ]
     conn.program_fetch(rows)
@@ -354,7 +402,7 @@ async def test_vector_search_converts_embedding_and_parses_results(db_utils_modu
     assert res[0]["similarity"] == 0.9
     # Ensure correct vector string generated (no spaces)
     params_seen = False
-    for (op, q, params) in conn.queries:
+    for op, q, params in conn.queries:
         if op == "fetch" and "match_chunks" in q:
             params_seen = True
             assert params[0] == "[1.0,2.0,3.0]"
@@ -368,9 +416,15 @@ async def test_hybrid_search_builds_params_and_maps_fields(db_utils_module, fake
     pool, conn = fake_pg
     rows = [
         {
-            "chunk_id": "c2", "document_id": "d2", "content": "bar",
-            "combined_score": 0.75, "vector_similarity": 0.8, "text_similarity": 0.7,
-            "metadata": json.dumps({"x": 2}), "document_title": "TT", "document_source": "SS"
+            "chunk_id": "c2",
+            "document_id": "d2",
+            "content": "bar",
+            "combined_score": 0.75,
+            "vector_similarity": 0.8,
+            "text_similarity": 0.7,
+            "metadata": json.dumps({"x": 2}),
+            "document_title": "TT",
+            "document_source": "SS",
         }
     ]
     conn.program_fetch(rows)
@@ -378,7 +432,7 @@ async def test_hybrid_search_builds_params_and_maps_fields(db_utils_module, fake
     assert res[0]["combined_score"] == 0.75
     # Ensure correct params passed
     found = False
-    for (op, q, params) in conn.queries:
+    for op, q, params in conn.queries:
         if op == "fetch" and "hybrid_search" in q:
             found = True
             assert params[0] == "[0.1,0.2]"
@@ -393,8 +447,18 @@ async def test_get_document_chunks_maps_rows(db_utils_module, fake_pg):
     m = db_utils_module
     pool, conn = fake_pg
     rows = [
-        {"chunk_id": "c1", "content": "a", "chunk_index": 0, "metadata": json.dumps({"m": 1})},
-        {"chunk_id": "c2", "content": "b", "chunk_index": 1, "metadata": json.dumps({})},
+        {
+            "chunk_id": "c1",
+            "content": "a",
+            "chunk_index": 0,
+            "metadata": json.dumps({"m": 1}),
+        },
+        {
+            "chunk_id": "c2",
+            "content": "b",
+            "chunk_index": 1,
+            "metadata": json.dumps({}),
+        },
     ]
     conn.program_fetch(rows)
     res = await m.get_document_chunks("d1")
@@ -412,7 +476,9 @@ async def test_execute_query_returns_dicts(db_utils_module, fake_pg):
 
 
 @pytest.mark.asyncio
-async def test_test_connection_success_and_failure(db_utils_module, fake_pg, monkeypatch):
+async def test_test_connection_success_and_failure(
+    db_utils_module, fake_pg, monkeypatch
+):
     m = db_utils_module
     pool, conn = fake_pg
     # Success
@@ -423,6 +489,7 @@ async def test_test_connection_success_and_failure(db_utils_module, fake_pg, mon
     class BadPool(FakePool):
         def acquire(self):
             raise RuntimeError("boom")
+
     bad_pool = BadPool(conn)
     m.db_pool.pool = bad_pool
     assert await m.test_connection() is False

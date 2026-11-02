@@ -27,7 +27,6 @@ from fastapi_app.db_utils import (
     add_message,
     get_session_messages,
     test_connection,
-
 )
 from fastapi_app.graph_utils import initialize_graph, close_graph, test_graph_connection
 from fastapi_app.models import (
@@ -92,7 +91,6 @@ HTTPXClientInstrumentor().instrument()
 
 # --- Langfuse Instrumentation ---
 from langfuse import Langfuse
-
 
 langfuse = Langfuse()
 # --- End Langfuse ---
@@ -193,16 +191,16 @@ def rate_limit_key(request: Request) -> str:
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     """
     Return a 429 JSONResponse when a rate limit is exceeded.
-    
+
     Logs a warning (including the rate-limit key) and returns a JSON body with keys:
     - error: short message,
     - error_type: "RateLimitExceeded",
     - request_id: a new UUID for tracing.
-    
+
     Parameters:
         request: FastAPI Request object for the current request (used to compute the rate-limit key).
         exc: The RateLimitExceeded exception instance (not inspected by this handler).
-    
+
     Returns:
         JSONResponse with status code 429 and the JSON body described above.
     """
@@ -221,14 +219,14 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 async def get_or_create_session(request: ChatRequest) -> str:
     """
     Retrieve an existing session ID from the provided ChatRequest or create a new session.
-    
+
     If request.session_id is present and corresponds to an existing session, that ID is returned.
     Otherwise a new session is created using request.user_id and request.metadata and the new session_id is returned.
-    
+
     Parameters:
         request (ChatRequest): Incoming chat request; uses `session_id` to look up an existing session,
             and `user_id`/`metadata` when creating a new session.
-    
+
     Returns:
         str: The existing or newly created session ID.
     """
@@ -263,10 +261,14 @@ async def get_conversation_context(
 async def auth_dependency(authorization: Optional[str] = Header(None)) -> str:
     """Simple bearer token authentication."""
     if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or missing token"
+        )
     token = authorization[7:]  # Extract everything after 'Bearer ' (case-insensitive)
     if not await verify_token(token.strip()):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
     return token.strip()
 
 
@@ -549,9 +551,7 @@ async def chat_stream(chat_request: ChatRequest):
                     context_str = "\n".join(
                         [f"{msg['role']}: {msg['content']}" for msg in context[-6:]]
                     )
-                    full_prompt = (
-                        f"Previous conversation:\n{context_str}\n\nCurrent question: {chat_request.message}"
-                    )
+                    full_prompt = f"Previous conversation:\n{context_str}\n\nCurrent question: {chat_request.message}"
 
                 # Save user message immediately
                 await add_message(
@@ -583,10 +583,9 @@ async def chat_stream(chat_request: ChatRequest):
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
 
-                                    elif (
-                                        isinstance(event, PartDeltaEvent)
-                                        and isinstance(event.delta, TextPartDelta)
-                                    ):
+                                    elif isinstance(
+                                        event, PartDeltaEvent
+                                    ) and isinstance(event.delta, TextPartDelta):
                                         delta_content = event.delta.content_delta
                                         yield f"data: {json.dumps({'type': 'text', 'content': delta_content})}\n\n"
                                         full_response += delta_content
@@ -644,8 +643,6 @@ async def chat_stream(chat_request: ChatRequest):
         logger.error(f"Streaming chat failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-
     """Vector search endpoint."""
     try:
         input_data = VectorSearchInput(query=request.query, limit=request.limit)
@@ -687,8 +684,6 @@ async def chat_stream(chat_request: ChatRequest):
     except Exception as e:
         logger.error(f"Graph search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
     """Hybrid search endpoint."""
     try:
